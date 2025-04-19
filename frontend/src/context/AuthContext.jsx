@@ -13,7 +13,7 @@ import {
   reauthenticateWithCredential,
   updateEmail,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
 
 const AuthContext = createContext()
 const googleProvider = new GoogleAuthProvider()
@@ -178,6 +178,32 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Update user profile in both Auth and Firestore
+  const updateUserProfile = async (profileData) => {
+    try {
+      if (!currentUser) throw new Error('No user is currently logged in')
+
+      // First update Firebase Auth display name if provided
+      if (profileData.displayName) {
+        await updateProfile(currentUser, {
+          displayName: profileData.displayName,
+        })
+      }
+
+      // Then update the user document in Firestore
+      const userRef = doc(db, 'users', currentUser.uid)
+      await updateDoc(userRef, profileData)
+
+      // Refresh the user profile in state
+      await fetchUserProfile()
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      throw error
+    }
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user)
@@ -205,6 +231,7 @@ export function AuthProvider({ children }) {
     updateUserPassword,
     updateUserEmail,
     reauthenticate,
+    updateUserProfile,
   }
 
   return (

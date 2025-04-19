@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchMovies, fetchGenres } from '../services/api'
 import { useAuth } from '../context/AuthContext'
-import { doc, updateDoc, getDoc } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/firebase'
 
 // Helper function to validate movie data
@@ -110,6 +110,7 @@ function User() {
     fetchUserProfile,
     updateUserPassword,
     updateUserEmail,
+    updateUserProfile,
   } = useAuth()
   const [userStats, setUserStats] = useState({
     movieCount: 0,
@@ -152,6 +153,12 @@ function User() {
   const [settingsError, setSettingsError] = useState('')
   const [settingsSuccess, setSettingsSuccess] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Add profileSubmitting state to track profile form submission
+  const [profileSubmitting, setProfileSubmitting] = useState(false)
+
+  // Add state for profile form errors
+  const [profileError, setProfileError] = useState('')
 
   // Calculate user statistics
   useEffect(() => {
@@ -356,6 +363,8 @@ function User() {
   const handleEditFormChange = (e) => {
     const { name, value } = e.target
     setEditForm((prev) => ({ ...prev, [name]: value }))
+    // Clear any previous error when form is changed
+    setProfileError('')
   }
 
   const handleGenreToggle = (genre) => {
@@ -375,14 +384,26 @@ function User() {
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault()
+
+    // Validate the form
+    if (!editForm.name.trim()) {
+      setProfileError('Display name cannot be empty')
+      return
+    }
+
+    // Validate username format (no spaces)
+    if (editForm.username && editForm.username.includes(' ')) {
+      setProfileError('Username cannot contain spaces')
+      return
+    }
+
     setLoading((prev) => ({ ...prev, profile: true }))
+    setProfileSubmitting(true)
+    setProfileError('') // Clear any errors
 
     try {
-      // Update the profile in Firestore
-      const userRef = doc(db, 'users', currentUser.uid)
-
-      // Prepare update data
-      const updateData = {
+      // Prepare update data for user profile
+      const profileData = {
         displayName: editForm.name,
         username: editForm.username,
         bio: editForm.bio,
@@ -390,18 +411,20 @@ function User() {
 
       // Only include favoriteGenres if there are selections
       if (editForm.selectedGenres.length > 0) {
-        updateData.favoriteGenres = editForm.selectedGenres
+        profileData.favoriteGenres = editForm.selectedGenres
       }
 
-      await updateDoc(userRef, updateData)
+      // Use the updateUserProfile function to handle both Auth and Firestore updates
+      await updateUserProfile(profileData)
 
-      // Refresh user profile
-      await fetchUserProfile()
       setIsEditingProfile(false)
     } catch (error) {
       console.error('Error updating profile:', error)
+      setProfileError(error.message || 'Failed to update profile')
     } finally {
       setLoading((prev) => ({ ...prev, profile: false }))
+      // Reset profile submitting state
+      setProfileSubmitting(false)
     }
   }
 
@@ -790,9 +813,18 @@ function User() {
                       name="username"
                       value={editForm.username}
                       onChange={handleEditFormChange}
-                      className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full max-w-md"
+                      className={`bg-[#252525] text-white px-3 py-1.5 rounded border ${
+                        editForm.username && editForm.username.includes(' ')
+                          ? 'border-red-500'
+                          : 'border-[#333]'
+                      } w-full max-w-md`}
                       placeholder="Username (no spaces)"
                     />
+                    {editForm.username && editForm.username.includes(' ') && (
+                      <p className="text-xs text-red-400 mt-1">
+                        Username cannot contain spaces
+                      </p>
+                    )}
                   </div>
                 ) : (
                   userProfile?.username && (
@@ -825,6 +857,13 @@ function User() {
                   </p>
                 )}
               </div>
+
+              {/* Display error message for profile form */}
+              {isEditingProfile && profileError && (
+                <div className="mb-6 bg-red-500/10 text-red-500 p-3 rounded-md max-w-lg">
+                  {profileError}
+                </div>
+              )}
 
               {/* Favorite Genres section */}
               <div className="mb-6">
@@ -1087,15 +1126,26 @@ function User() {
                 <div className="flex gap-3 mt-8">
                   <button
                     onClick={() => setIsEditingProfile(false)}
-                    className="px-4 py-2 rounded text-white bg-[#333] hover:bg-[#444]"
+                    className="px-4 py-2 rounded text-white bg-[#333] hover:bg-[#444] disabled:opacity-50"
+                    disabled={profileSubmitting}
+                    type="button"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleProfileSubmit}
-                    className="px-4 py-2 rounded text-black bg-[#5ccfee] hover:bg-[#4abfe0]"
+                    className="px-4 py-2 rounded text-black bg-[#5ccfee] hover:bg-[#4abfe0] disabled:opacity-50 flex items-center justify-center"
+                    disabled={profileSubmitting}
+                    type="button"
                   >
-                    Save Profile
+                    {profileSubmitting ? (
+                      <>
+                        <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></span>
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Profile'
+                    )}
                   </button>
                 </div>
               )}
