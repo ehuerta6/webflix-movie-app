@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchMovies, fetchGenres } from '../services/api'
 import { useAuth } from '../context/AuthContext'
-import { doc, getDoc } from 'firebase/firestore'
-import { db } from '../firebase/firebase'
 
 // Helper function to validate movie data
 const isValidMovie = (movie) => {
@@ -111,6 +109,9 @@ function User() {
     updateUserPassword,
     updateUserEmail,
     updateUserProfile,
+    removeFromWatchlist,
+    removeFromFavorites,
+    updateFavoriteGenres,
   } = useAuth()
   const [userStats, setUserStats] = useState({
     movieCount: 0,
@@ -253,61 +254,51 @@ function User() {
     loadGenres()
   }, [])
 
-  // Load 'liked' movies data
+  // Load user watchlist and favorites from profile data
   useEffect(() => {
-    const fetchLikedMovies = async () => {
-      if (!Object.keys(genreMap).length) return
+    if (userProfile && Object.keys(genreMap).length > 0) {
+      // Format favorites data
+      if (userProfile.favorites && userProfile.favorites.length > 0) {
+        const formattedFavorites = userProfile.favorites
+          .filter((item) => item.type === 'movie')
+          .map((movie) => ({
+            id: movie.id,
+            title: movie.title,
+            poster:
+              movie.poster ||
+              'https://via.placeholder.com/342x513?text=No+Image',
+            year: movie.year || 'N/A',
+            rating: movie.rating || 'N/A',
+            // Find genre by ID if available, otherwise use the first available genre
+            genre: movie.genres && movie.genres[0] ? movie.genres[0] : null,
+          }))
 
-      setLoading((prev) => ({ ...prev, liked: true }))
-      try {
-        // In a real app, you would fetch the user's liked movies from Firestore
-        // For now, just fetch some popular movies as an example
-        const data = await fetchMovies({ sort_by: 'popularity.desc' }, 1, 10)
+        setLikedMovies(formattedFavorites)
+      } else {
+        setLikedMovies([])
+      }
 
-        // Filter and format valid movies
-        const formattedMovies = data.results
-          .filter(isValidMovie)
-          .map((movie) => formatMovieData(movie, genreMap))
-          .slice(0, 8)
+      // Format watchlist data
+      if (userProfile.watchlist && userProfile.watchlist.length > 0) {
+        const formattedWatchlist = userProfile.watchlist
+          .filter((item) => item.type === 'movie')
+          .map((movie) => ({
+            id: movie.id,
+            title: movie.title,
+            poster:
+              movie.poster ||
+              'https://via.placeholder.com/342x513?text=No+Image',
+            year: movie.year || 'N/A',
+            rating: movie.rating || 'N/A',
+            genre: movie.genres && movie.genres[0] ? movie.genres[0] : null,
+          }))
 
-        setLikedMovies(formattedMovies)
-      } catch (error) {
-        console.error('Error fetching liked movies:', error)
-      } finally {
-        setLoading((prev) => ({ ...prev, liked: false }))
+        setWatchlistMovies(formattedWatchlist)
+      } else {
+        setWatchlistMovies([])
       }
     }
-
-    fetchLikedMovies()
-  }, [genreMap])
-
-  // Load 'watchlist' movies data
-  useEffect(() => {
-    const fetchWatchlistMovies = async () => {
-      if (!Object.keys(genreMap).length) return
-
-      setLoading((prev) => ({ ...prev, watchlist: true }))
-      try {
-        // In a real app, you would fetch the user's watchlist from Firestore
-        // For now, just fetch some top-rated movies as an example
-        const data = await fetchMovies({ sort_by: 'vote_average.desc' }, 1, 10)
-
-        // Filter and format valid movies
-        const formattedMovies = data.results
-          .filter(isValidMovie)
-          .map((movie) => formatMovieData(movie, genreMap))
-          .slice(0, 8)
-
-        setWatchlistMovies(formattedMovies)
-      } catch (error) {
-        console.error('Error fetching watchlist movies:', error)
-      } finally {
-        setLoading((prev) => ({ ...prev, watchlist: false }))
-      }
-    }
-
-    fetchWatchlistMovies()
-  }, [genreMap])
+  }, [userProfile, genreMap])
 
   // Fetch movie recommendations based on favorite genres
   useEffect(() => {
@@ -319,7 +310,7 @@ function User() {
       try {
         // Look up genre IDs from genre names
         const genreIds = Object.entries(genreMap)
-          .filter(([_, name]) => userProfile.favoriteGenres.includes(name))
+          .filter(([, name]) => userProfile.favoriteGenres.includes(name))
           .map(([id]) => id)
           .join(',')
 
@@ -409,13 +400,16 @@ function User() {
         bio: editForm.bio,
       }
 
-      // Only include favoriteGenres if there are selections
-      if (editForm.selectedGenres.length > 0) {
-        profileData.favoriteGenres = editForm.selectedGenres
-      }
-
-      // Use the updateUserProfile function to handle both Auth and Firestore updates
+      // Update the user profile
       await updateUserProfile(profileData)
+
+      // Separately update favorite genres if they've changed
+      if (
+        JSON.stringify(editForm.selectedGenres) !==
+        JSON.stringify(userProfile?.favoriteGenres || [])
+      ) {
+        await updateFavoriteGenres(editForm.selectedGenres)
+      }
 
       setIsEditingProfile(false)
     } catch (error) {
@@ -423,7 +417,6 @@ function User() {
       setProfileError(error.message || 'Failed to update profile')
     } finally {
       setLoading((prev) => ({ ...prev, profile: false }))
-      // Reset profile submitting state
       setProfileSubmitting(false)
     }
   }
@@ -560,11 +553,35 @@ function User() {
     }
   }
 
+  // Handle removing an item from favorites
+  const handleRemoveFromFavorites = async (mediaId) => {
+    try {
+      await removeFromFavorites(mediaId, 'movie')
+      // The userProfile will be updated via AuthContext, which will trigger the useEffect above
+    } catch (error) {
+      console.error('Error removing from favorites:', error)
+    }
+  }
+
+  // Handle removing an item from watchlist
+  const handleRemoveFromWatchlist = async (mediaId) => {
+    try {
+      await removeFromWatchlist(mediaId, 'movie')
+      // The userProfile will be updated via AuthContext, which will trigger the useEffect above
+    } catch (error) {
+      console.error('Error removing from watchlist:', error)
+    }
+  }
+
   // Movie collection actions
   const collectionActions = {
     liked: (movie) => (
       <>
-        <button className="text-red-500 hover:text-red-400" aria-label="Unlike">
+        <button
+          className="text-red-500 hover:text-red-400"
+          aria-label="Unlike"
+          onClick={() => handleRemoveFromFavorites(movie.id)}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-4 w-4"
@@ -603,6 +620,7 @@ function User() {
         <button
           className="text-[#5ccfee] hover:text-[#4ab3d3]"
           aria-label="View details"
+          onClick={() => handleRemoveFromWatchlist(movie.id)}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -639,10 +657,16 @@ function User() {
     ),
     recommendations: (movie) => (
       <div className="flex space-x-1 w-full">
-        <button className="flex-1 text-xs text-center py-0.5 rounded bg-[#1d1d1d] hover:bg-[#333] text-gray-300 text-[10px]">
+        <button
+          className="flex-1 text-xs text-center py-0.5 rounded bg-[#1d1d1d] hover:bg-[#333] text-gray-300 text-[10px]"
+          onClick={() => navigate(`/movie/${movie.id}`)}
+        >
           + Watch
         </button>
-        <button className="flex-1 text-xs text-center py-0.5 rounded bg-[#1d1d1d] hover:bg-[#333] text-gray-300 text-[10px]">
+        <button
+          className="flex-1 text-xs text-center py-0.5 rounded bg-[#1d1d1d] hover:bg-[#333] text-gray-300 text-[10px]"
+          onClick={() => navigate(`/movie/${movie.id}`)}
+        >
           Like
         </button>
       </div>

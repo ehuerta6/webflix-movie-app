@@ -204,6 +204,214 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Add to watchlist
+  const addToWatchlist = async (media) => {
+    try {
+      if (!currentUser) throw new Error('No user is currently logged in')
+
+      const mediaItem = {
+        id: media.id,
+        type: media.media_type || media.type,
+        title: media.title || media.name,
+        poster: media.poster_path
+          ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
+          : null,
+        backdrop: media.backdrop_path
+          ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`
+          : null,
+        rating: media.vote_average ? media.vote_average.toFixed(1) : '0.0',
+        year: media.release_date
+          ? media.release_date.split('-')[0]
+          : media.first_air_date
+          ? media.first_air_date.split('-')[0]
+          : 'N/A',
+      }
+
+      const userRef = doc(db, 'users', currentUser.uid)
+
+      // First get current watchlist to check for duplicates
+      const userDoc = await getDoc(userRef)
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
+        const watchlist = userData.watchlist || []
+
+        // Check if item already exists in watchlist
+        const existingItem = watchlist.find(
+          (item) => item.id === mediaItem.id && item.type === mediaItem.type
+        )
+        if (existingItem) {
+          return { success: true, message: 'Item already in watchlist' }
+        }
+
+        // Add item to watchlist
+        await updateDoc(userRef, {
+          watchlist: [...watchlist, mediaItem],
+        })
+
+        // Refresh user profile
+        await fetchUserProfile()
+
+        return { success: true }
+      }
+
+      return { success: false, message: 'User document not found' }
+    } catch (error) {
+      console.error('Error adding to watchlist:', error)
+      throw error
+    }
+  }
+
+  // Remove from watchlist
+  const removeFromWatchlist = async (mediaId, mediaType) => {
+    try {
+      if (!currentUser) throw new Error('No user is currently logged in')
+
+      const userRef = doc(db, 'users', currentUser.uid)
+
+      // Get current watchlist
+      const userDoc = await getDoc(userRef)
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
+        const watchlist = userData.watchlist || []
+
+        // Filter out the item to remove
+        const updatedWatchlist = watchlist.filter(
+          (item) => !(item.id === mediaId && item.type === mediaType)
+        )
+
+        // Update the document
+        await updateDoc(userRef, {
+          watchlist: updatedWatchlist,
+        })
+
+        // Refresh user profile
+        await fetchUserProfile()
+
+        return { success: true }
+      }
+
+      return { success: false, message: 'User document not found' }
+    } catch (error) {
+      console.error('Error removing from watchlist:', error)
+      throw error
+    }
+  }
+
+  // Add to favorites
+  const addToFavorites = async (media) => {
+    try {
+      if (!currentUser) throw new Error('No user is currently logged in')
+
+      const mediaItem = {
+        id: media.id,
+        type: media.media_type || media.type,
+        title: media.title || media.name,
+        poster: media.poster_path
+          ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
+          : null,
+        backdrop: media.backdrop_path
+          ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`
+          : null,
+        rating: media.vote_average ? media.vote_average.toFixed(1) : '0.0',
+        year: media.release_date
+          ? media.release_date.split('-')[0]
+          : media.first_air_date
+          ? media.first_air_date.split('-')[0]
+          : 'N/A',
+      }
+
+      const userRef = doc(db, 'users', currentUser.uid)
+
+      // First get current favorites to check for duplicates
+      const userDoc = await getDoc(userRef)
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
+        const favorites = userData.favorites || []
+
+        // Check if item already exists in favorites
+        const existingItem = favorites.find(
+          (item) => item.id === mediaItem.id && item.type === mediaItem.type
+        )
+        if (existingItem) {
+          return { success: true, message: 'Item already in favorites' }
+        }
+
+        // Add item to favorites
+        await updateDoc(userRef, {
+          favorites: [...favorites, mediaItem],
+        })
+
+        // Refresh user profile
+        await fetchUserProfile()
+
+        return { success: true }
+      }
+
+      return { success: false, message: 'User document not found' }
+    } catch (error) {
+      console.error('Error adding to favorites:', error)
+      throw error
+    }
+  }
+
+  // Remove from favorites
+  const removeFromFavorites = async (mediaId, mediaType) => {
+    try {
+      if (!currentUser) throw new Error('No user is currently logged in')
+
+      const userRef = doc(db, 'users', currentUser.uid)
+
+      // Get current favorites
+      const userDoc = await getDoc(userRef)
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
+        const favorites = userData.favorites || []
+
+        // Filter out the item to remove
+        const updatedFavorites = favorites.filter(
+          (item) => !(item.id === mediaId && item.type === mediaType)
+        )
+
+        // Update the document
+        await updateDoc(userRef, {
+          favorites: updatedFavorites,
+        })
+
+        // Refresh user profile
+        await fetchUserProfile()
+
+        return { success: true }
+      }
+
+      return { success: false, message: 'User document not found' }
+    } catch (error) {
+      console.error('Error removing from favorites:', error)
+      throw error
+    }
+  }
+
+  // Update favorite genres
+  const updateFavoriteGenres = async (genres) => {
+    try {
+      if (!currentUser) throw new Error('No user is currently logged in')
+
+      const userRef = doc(db, 'users', currentUser.uid)
+
+      // Update favorite genres
+      await updateDoc(userRef, {
+        favoriteGenres: genres,
+      })
+
+      // Refresh user profile
+      await fetchUserProfile()
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error updating favorite genres:', error)
+      throw error
+    }
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user)
@@ -232,6 +440,11 @@ export function AuthProvider({ children }) {
     updateUserEmail,
     reauthenticate,
     updateUserProfile,
+    addToWatchlist,
+    removeFromWatchlist,
+    addToFavorites,
+    removeFromFavorites,
+    updateFavoriteGenres,
   }
 
   return (
