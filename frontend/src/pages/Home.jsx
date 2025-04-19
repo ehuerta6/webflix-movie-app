@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import MovieCard from '../components/MovieCard'
 import { fetchTrending, fetchMovies, fetchShows } from '../services/api'
+import { useAuth } from '../context/AuthContext'
 
 // Helper function to validate if a movie/show has all required fields
 const isValidContent = (item) => {
@@ -36,6 +37,7 @@ function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const carouselTimerRef = useRef(null)
+  const { currentUser } = useAuth()
 
   // Format movie data to be consistent with MovieCard component
   const formatMovieData = (movie) => ({
@@ -364,23 +366,25 @@ function Home() {
                   </span>{' '}
                   Watch
                 </Link>
-                <button className="secondary-button cursor-pointer flex items-center gap-1 hover:bg-[#5ccfee20]">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  Add to List
-                </button>
+                {currentUser && (
+                  <button className="secondary-button cursor-pointer flex items-center gap-1 hover:bg-[#5ccfee20]">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    Add to List
+                  </button>
+                )}
               </div>
 
               {/* Carousel indicators */}

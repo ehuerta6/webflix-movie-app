@@ -10,6 +10,7 @@ import {
 } from '../services/api'
 import Pagination from '../components/Pagination'
 import ResultCard from '../components/ResultCard'
+import { useAuth } from '../context/AuthContext'
 
 function SearchPage() {
   const location = useLocation()
@@ -17,6 +18,7 @@ function SearchPage() {
   const queryParams = new URLSearchParams(location.search)
   const searchQuery = queryParams.get('q') || ''
   const [searchInput, setSearchInput] = useState(searchQuery)
+  const { currentUser } = useAuth()
 
   const [searchResults, setSearchResults] = useState([])
   const [popularMovies, setPopularMovies] = useState([])
@@ -462,23 +464,25 @@ function SearchPage() {
                   </span>{' '}
                   Watch
                 </Link>
-                <button className="inline-block bg-transparent border border-white text-white px-5 py-2 rounded hover:bg-[#5ccfee20] transition-colors flex items-center gap-1">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  Add to List
-                </button>
+                {currentUser && (
+                  <button className="inline-block bg-transparent border border-white text-white px-5 py-2 rounded hover:bg-[#5ccfee20] transition-colors flex items-center gap-1">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    Add to List
+                  </button>
+                )}
               </div>
 
               {/* Carousel indicators */}

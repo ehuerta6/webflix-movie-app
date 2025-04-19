@@ -253,35 +253,34 @@ users/
   ├── {userId}/
   │     ├── uid: string                 // Firebase auth user ID
   │     ├── displayName: string         // User's display name
-  │     ├── username: string            // User's unique username (for @mentions)
   │     ├── email: string               // User's email address
-  │     ├── bio: string                 // User's bio or description
-  │     ├── favoriteGenres: string[]    // List of favorite movie/show genres
   │     │
-  │     ├── watchlist: [                // Movies/shows the user wants to watch
+  │     ├── watchlist: [                // Movies/shows the user wants to watch (array with indexes)
   │     │     {
   │     │         id: number,           // TMDB ID of the movie/show
   │     │         type: string,         // "movie" or "tv"
   │     │         title: string,        // Title of the movie/show
   │     │         poster: string,       // URL to poster image
-  │     │         backdrop: string,     // URL to backdrop image (optional)
+  │     │         backdrop: string,     // URL to backdrop image
   │     │         rating: string,       // Rating (e.g., "8.5")
   │     │         year: string,         // Release year
   │     │     }
   │     │   ]
   │     │
-  │     └── favorites: [                // User's favorite movies/shows
+  │     └── favorites: [                // User's favorite movies/shows (array with indexes)
   │           {
   │               id: number,           // TMDB ID of the movie/show
   │               type: string,         // "movie" or "tv"
   │               title: string,        // Title of the movie/show
   │               poster: string,       // URL to poster image
-  │               backdrop: string,     // URL to backdrop image (optional)
+  │               backdrop: string,     // URL to backdrop image
   │               rating: string,       // Rating (e.g., "8.5")
   │               year: string,         // Release year
   │           }
   │         ]
 ```
+
+**Note:** Arrays in Firestore use indexes for efficient access. When adding or removing items from `watchlist` or `favorites` arrays, use the appropriate Firestore operations (e.g., `arrayUnion()` and `arrayRemove()`) to maintain performance and avoid race conditions.
 
 ## Implementing User Features
 
