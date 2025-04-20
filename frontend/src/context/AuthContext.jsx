@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { auth, db } from '../firebase/firebase'
+import {
+  auth,
+  // Keep db import commented for future use
+  // eslint-disable-next-line no-unused-vars
+  db,
+} from '../firebase/firebase'
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -13,6 +18,8 @@ import {
   reauthenticateWithCredential,
   updateEmail,
 } from 'firebase/auth'
+// Keep Firestore imports commented for future use
+// eslint-disable-next-line no-unused-vars
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
 
 const AuthContext = createContext()
@@ -50,8 +57,8 @@ export function AuthProvider({ children }) {
       // Update profile with display name
       await updateProfile(userCredential.user, { displayName })
 
-      // Create user document in Firestore
-      await createUserDocument(userCredential.user)
+      // Will implement Firestore later
+      console.log('Creating user document for:', userCredential.user.uid)
 
       return userCredential
     } catch (error) {
@@ -65,11 +72,8 @@ export function AuthProvider({ children }) {
     try {
       const result = await signInWithPopup(auth, googleProvider)
 
-      // Check if this is a new user
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid))
-      if (!userDoc.exists()) {
-        await createUserDocument(result.user)
-      }
+      // Will implement Firestore check later
+      console.log('Google sign-in successful for user:', result.user.uid)
 
       return result
     } catch (error) {
@@ -78,31 +82,15 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Create user document in Firestore
+  // Create user document in Firestore - placeholder for future implementation
+  // eslint-disable-next-line no-unused-vars
   const createUserDocument = async (user) => {
     if (!user) return
 
-    const userRef = doc(db, 'users', user.uid)
-    const userSnap = await getDoc(userRef)
+    console.log('Will create user document for:', user.uid)
 
-    if (!userSnap.exists()) {
-      const { displayName, email, uid } = user
-
-      try {
-        await setDoc(userRef, {
-          uid,
-          displayName: displayName || 'Webflix User',
-          username: email.split('@')[0],
-          email,
-          bio: 'Movie enthusiast and aspiring critic.',
-          favoriteGenres: [],
-          watchlist: [],
-          favorites: [],
-        })
-      } catch (error) {
-        console.error('Error creating user document:', error)
-      }
-    }
+    // Firestore implementation will be added later
+    return { success: true }
   }
 
   // Re-authenticate the user before sensitive operations
@@ -146,12 +134,8 @@ export function AuthProvider({ children }) {
       // Then update the email
       await updateEmail(currentUser, newEmail)
 
-      // Update email in Firestore
-      const userRef = doc(db, 'users', currentUser.uid)
-      await updateDoc(userRef, { email: newEmail })
-
-      // Refresh user profile
-      await fetchUserProfile()
+      // Will implement Firestore update later
+      console.log('Will update email in database for user:', currentUser.uid)
 
       return { success: true }
     } catch (error) {
@@ -160,25 +144,33 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Fetch user profile from Firestore
+  // Fetch user profile - placeholder for future Firestore implementation
   const fetchUserProfile = async () => {
     if (!currentUser) return null
 
     try {
-      const userDoc = await getDoc(doc(db, 'users', currentUser.uid))
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        setUserProfile(userData)
-        return userData
+      // Mock user profile data for now
+      const mockUserProfile = {
+        uid: currentUser.uid,
+        displayName: currentUser.displayName || 'Webflix User',
+        username: currentUser.email?.split('@')[0] || 'user',
+        email: currentUser.email,
+        bio: 'Movie enthusiast and aspiring critic.',
+        favoriteGenres: [],
+        watchlist: [],
+        favorites: [],
       }
-      return null
+
+      setUserProfile(mockUserProfile)
+      console.log('Fetched user profile (mock):', currentUser.uid)
+      return mockUserProfile
     } catch (error) {
       console.error('Error fetching user profile:', error)
       return null
     }
   }
 
-  // Update user profile in both Auth and Firestore
+  // Update user profile - placeholder for future implementation
   const updateUserProfile = async (profileData) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
@@ -190,12 +182,14 @@ export function AuthProvider({ children }) {
         })
       }
 
-      // Then update the user document in Firestore
-      const userRef = doc(db, 'users', currentUser.uid)
-      await updateDoc(userRef, profileData)
+      // Will implement Firestore update later
+      console.log('Will update profile in database:', profileData)
 
-      // Refresh the user profile in state
-      await fetchUserProfile()
+      // Update the local profile state with the new data
+      setUserProfile((prev) => ({
+        ...prev,
+        ...profileData,
+      }))
 
       return { success: true }
     } catch (error) {
@@ -204,7 +198,7 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Add to watchlist
+  // Add to watchlist - placeholder implementation
   const addToWatchlist = async (media) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
@@ -227,77 +221,73 @@ export function AuthProvider({ children }) {
           : 'N/A',
       }
 
-      const userRef = doc(db, 'users', currentUser.uid)
+      console.log(
+        'Adding to watchlist (will implement database later):',
+        mediaItem
+      )
 
-      // First get current watchlist to check for duplicates
-      const userDoc = await getDoc(userRef)
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        const watchlist = userData.watchlist || []
+      // Update local state
+      setUserProfile((prev) => {
+        if (!prev) return null
 
-        // Check if item already exists in watchlist
+        const watchlist = prev.watchlist || []
+        // Check if item already exists
         const existingItem = watchlist.find(
           (item) => item.id === mediaItem.id && item.type === mediaItem.type
         )
+
         if (existingItem) {
-          return { success: true, message: 'Item already in watchlist' }
+          console.log('Item already in watchlist')
+          return prev
         }
 
-        // Add item to watchlist
-        await updateDoc(userRef, {
+        return {
+          ...prev,
           watchlist: [...watchlist, mediaItem],
-        })
+        }
+      })
 
-        // Refresh user profile
-        await fetchUserProfile()
-
-        return { success: true }
-      }
-
-      return { success: false, message: 'User document not found' }
+      return { success: true }
     } catch (error) {
       console.error('Error adding to watchlist:', error)
       throw error
     }
   }
 
-  // Remove from watchlist
+  // Remove from watchlist - placeholder implementation
   const removeFromWatchlist = async (mediaId, mediaType) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
 
-      const userRef = doc(db, 'users', currentUser.uid)
+      console.log(
+        'Removing from watchlist (will implement database later):',
+        mediaId,
+        mediaType
+      )
 
-      // Get current watchlist
-      const userDoc = await getDoc(userRef)
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        const watchlist = userData.watchlist || []
+      // Update local state
+      setUserProfile((prev) => {
+        if (!prev) return null
 
-        // Filter out the item to remove
+        const watchlist = prev.watchlist || []
         const updatedWatchlist = watchlist.filter(
           (item) => !(item.id === mediaId && item.type === mediaType)
         )
 
-        // Update the document
-        await updateDoc(userRef, {
+        return {
+          ...prev,
           watchlist: updatedWatchlist,
-        })
+        }
+      })
 
-        // Refresh user profile
-        await fetchUserProfile()
-
-        return { success: true }
-      }
-
-      return { success: false, message: 'User document not found' }
+      return { success: true }
     } catch (error) {
       console.error('Error removing from watchlist:', error)
       throw error
     }
   }
 
-  // Add to favorites
+  // Add to favorites - placeholder implementation
   const addToFavorites = async (media) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
@@ -320,90 +310,90 @@ export function AuthProvider({ children }) {
           : 'N/A',
       }
 
-      const userRef = doc(db, 'users', currentUser.uid)
+      console.log(
+        'Adding to favorites (will implement database later):',
+        mediaItem
+      )
 
-      // First get current favorites to check for duplicates
-      const userDoc = await getDoc(userRef)
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        const favorites = userData.favorites || []
+      // Update local state
+      setUserProfile((prev) => {
+        if (!prev) return null
 
-        // Check if item already exists in favorites
+        const favorites = prev.favorites || []
+        // Check if item already exists
         const existingItem = favorites.find(
           (item) => item.id === mediaItem.id && item.type === mediaItem.type
         )
+
         if (existingItem) {
-          return { success: true, message: 'Item already in favorites' }
+          console.log('Item already in favorites')
+          return prev
         }
 
-        // Add item to favorites
-        await updateDoc(userRef, {
+        return {
+          ...prev,
           favorites: [...favorites, mediaItem],
-        })
+        }
+      })
 
-        // Refresh user profile
-        await fetchUserProfile()
-
-        return { success: true }
-      }
-
-      return { success: false, message: 'User document not found' }
+      return { success: true }
     } catch (error) {
       console.error('Error adding to favorites:', error)
       throw error
     }
   }
 
-  // Remove from favorites
+  // Remove from favorites - placeholder implementation
   const removeFromFavorites = async (mediaId, mediaType) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
 
-      const userRef = doc(db, 'users', currentUser.uid)
+      console.log(
+        'Removing from favorites (will implement database later):',
+        mediaId,
+        mediaType
+      )
 
-      // Get current favorites
-      const userDoc = await getDoc(userRef)
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        const favorites = userData.favorites || []
+      // Update local state
+      setUserProfile((prev) => {
+        if (!prev) return null
 
-        // Filter out the item to remove
+        const favorites = prev.favorites || []
         const updatedFavorites = favorites.filter(
           (item) => !(item.id === mediaId && item.type === mediaType)
         )
 
-        // Update the document
-        await updateDoc(userRef, {
+        return {
+          ...prev,
           favorites: updatedFavorites,
-        })
+        }
+      })
 
-        // Refresh user profile
-        await fetchUserProfile()
-
-        return { success: true }
-      }
-
-      return { success: false, message: 'User document not found' }
+      return { success: true }
     } catch (error) {
       console.error('Error removing from favorites:', error)
       throw error
     }
   }
 
-  // Update favorite genres
+  // Update favorite genres - placeholder implementation
   const updateFavoriteGenres = async (genres) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
 
-      const userRef = doc(db, 'users', currentUser.uid)
+      console.log(
+        'Updating favorite genres (will implement database later):',
+        genres
+      )
 
-      // Update favorite genres
-      await updateDoc(userRef, {
-        favoriteGenres: genres,
+      // Update local state
+      setUserProfile((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          favoriteGenres: genres,
+        }
       })
-
-      // Refresh user profile
-      await fetchUserProfile()
 
       return { success: true }
     } catch (error) {

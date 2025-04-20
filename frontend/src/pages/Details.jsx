@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { fetchMovieDetails, fetchShowDetails } from '../services/api'
 import MediaActions from '../components/MediaActions'
+import { useAuth } from '../context/AuthContext'
 
 // Helper function with simplified content validation
 const isValidContent = (item) => {
@@ -163,6 +164,7 @@ const CastCard = ({ person }) => {
 function Details() {
   const { id, type } = useParams()
   const navigate = useNavigate()
+  const { addToWatchlist } = useAuth()
   const [details, setDetails] = useState(null)
   const [similarContent, setSimilarContent] = useState([])
   const [cast, setCast] = useState([])
@@ -172,6 +174,21 @@ function Details() {
   // Image loading states
   const [backdropLoaded, setBackdropLoaded] = useState(false)
   const [posterLoaded, setPosterLoaded] = useState(false)
+
+  // Handle adding to watchlist
+  const handleAddToWatchlist = async (media) => {
+    console.log('Adding to watchlist:', media)
+    try {
+      if (addToWatchlist) {
+        await addToWatchlist(media)
+        console.log('Successfully added to watchlist!')
+      } else {
+        console.log('addToWatchlist function not found in AuthContext')
+      }
+    } catch (error) {
+      console.error('Error adding to watchlist:', error)
+    }
+  }
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -515,6 +532,39 @@ function Details() {
                   </a>
                 )}
                 <MediaActions media={details} />
+
+                {/* Custom add to watchlist button for testing */}
+                <button
+                  onClick={() =>
+                    handleAddToWatchlist({
+                      id: details.id,
+                      title: details.title,
+                      poster_path: details.poster,
+                      media_type: type,
+                      vote_average: parseFloat(details.rating),
+                      release_date: `${details.year}-01-01`,
+                      // Add overview for better data
+                      overview: details.description,
+                    })
+                  }
+                  className="bg-[#252525] text-white hover:bg-[#333] px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                    />
+                  </svg>
+                  Test Watchlist
+                </button>
               </div>
 
               {/* Additional Info Grid */}

@@ -38,6 +38,10 @@ function MediaActions({ media }) {
           item.id === media.id && item.type === (media.media_type || media.type)
       )
       setIsInFavorites(!!favoritesItem)
+    } else {
+      // Reset states if userProfile is null
+      setIsInWatchlist(false)
+      setIsInFavorites(false)
     }
   }, [userProfile, media])
 
@@ -49,9 +53,30 @@ function MediaActions({ media }) {
 
     try {
       if (isInWatchlist) {
-        await removeFromWatchlist(media.id, media.media_type || media.type)
+        // Format needed for removeFromWatchlist
+        const mediaId = media.id
+        const mediaType = media.media_type || media.type
+
+        console.log('Removing from watchlist:', { mediaId, mediaType })
+        await removeFromWatchlist(mediaId, mediaType)
       } else {
-        await addToWatchlist(media)
+        // Format media data for addToWatchlist
+        const formattedMedia = {
+          id: media.id,
+          title: media.title || media.name,
+          poster_path: media.poster || media.poster_path,
+          media_type: media.media_type || media.type,
+          vote_average: media.rating
+            ? parseFloat(media.rating)
+            : media.vote_average || 0,
+          release_date: media.year
+            ? `${media.year}-01-01`
+            : media.release_date || media.first_air_date || null,
+          overview: media.description || media.overview || '',
+        }
+
+        console.log('Adding to watchlist:', formattedMedia)
+        await addToWatchlist(formattedMedia)
       }
     } catch (error) {
       console.error('Error updating watchlist:', error)
@@ -68,9 +93,30 @@ function MediaActions({ media }) {
 
     try {
       if (isInFavorites) {
-        await removeFromFavorites(media.id, media.media_type || media.type)
+        // Format needed for removeFromFavorites
+        const mediaId = media.id
+        const mediaType = media.media_type || media.type
+
+        console.log('Removing from favorites:', { mediaId, mediaType })
+        await removeFromFavorites(mediaId, mediaType)
       } else {
-        await addToFavorites(media)
+        // Format media data for addToFavorites
+        const formattedMedia = {
+          id: media.id,
+          title: media.title || media.name,
+          poster_path: media.poster || media.poster_path,
+          media_type: media.media_type || media.type,
+          vote_average: media.rating
+            ? parseFloat(media.rating)
+            : media.vote_average || 0,
+          release_date: media.year
+            ? `${media.year}-01-01`
+            : media.release_date || media.first_air_date || null,
+          overview: media.description || media.overview || '',
+        }
+
+        console.log('Adding to favorites:', formattedMedia)
+        await addToFavorites(formattedMedia)
       }
     } catch (error) {
       console.error('Error updating favorites:', error)
