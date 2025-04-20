@@ -589,12 +589,12 @@ function SearchPage() {
                 <div className="featured-buttons mt-4 flex gap-3">
                   <button
                     onClick={() => handleAddToWatchlist(movie)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer ${
                       userProfile?.watchlist?.some(
                         (item) => item.id === movie.id
                       )
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-800 text-white'
+                        ? 'bg-[#5ccfee] text-black'
+                        : 'bg-gray-800 text-white hover:bg-gray-700'
                     }`}
                   >
                     <svg

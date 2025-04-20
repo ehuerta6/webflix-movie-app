@@ -17,6 +17,19 @@
     display: flex;
     flex-direction: column;
   }
+
+  /* Make all buttons have pointer cursor by default */
+  button {
+    cursor: pointer;
+  }
+
+  /* Apply pointer cursor to interactive elements */
+  a,
+  .btn,
+  [role='button'],
+  .clickable {
+    cursor: pointer;
+  }
 }
 
 /* Custom scrollbar for a better user experience */

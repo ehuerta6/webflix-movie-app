@@ -14,6 +14,7 @@ const MovieCard = memo(function MovieCard({ movie }) {
     removeFromWatchlist,
     removeFromFavorites,
     removeFromWatched,
+    fetchUserProfile,
   } = useAuth()
 
   // Check if movie is in the user's collections
@@ -75,6 +76,9 @@ const MovieCard = memo(function MovieCard({ movie }) {
           console.log('addToWatchlist function not found in AuthContext')
         }
       }
+
+      // Refresh user profile to update UI
+      await fetchUserProfile()
     } catch (error) {
       console.error('Error handling watchlist:', error)
     }
@@ -114,12 +118,16 @@ const MovieCard = memo(function MovieCard({ movie }) {
             release_date: year ? `${year}-01-01` : null,
           }
 
-          await addToFavorites(mediaToAdd)
+          // Call the Firestore function with the right parameters
+          await addToFavorites(currentUser.uid, id, JSON.stringify(mediaToAdd))
           console.log('Successfully added to liked movies!')
         } else {
           console.log('addToFavorites function not found in AuthContext')
         }
       }
+
+      // Refresh user profile to update UI
+      await fetchUserProfile()
     } catch (error) {
       console.error('Error handling favorites:', error)
     }
@@ -166,6 +174,9 @@ const MovieCard = memo(function MovieCard({ movie }) {
           console.log('addToWatched function not found in AuthContext')
         }
       }
+
+      // Refresh user profile to update UI
+      await fetchUserProfile()
     } catch (error) {
       console.error('Error handling watched status:', error)
     }
@@ -227,8 +238,8 @@ const MovieCard = memo(function MovieCard({ movie }) {
           <button
             onClick={handleAddToWatchlist}
             className={`p-1.5 ${
-              isInWatchlist ? 'bg-[#5ccfee]/80' : 'bg-black/70 hover:bg-[#333]'
-            } rounded-full text-white transition-colors`}
+              isInWatchlist ? 'bg-[#5ccfee]' : 'bg-black/70 hover:bg-[#333]'
+            } rounded-full text-white transition-colors cursor-pointer`}
             title={isInWatchlist ? 'In your watchlist' : 'Add to watchlist'}
           >
             <svg
@@ -252,7 +263,7 @@ const MovieCard = memo(function MovieCard({ movie }) {
             onClick={handleAddToFavorites}
             className={`p-1.5 ${
               isInFavorites ? 'bg-red-500/80' : 'bg-black/70 hover:bg-[#333]'
-            } rounded-full text-white transition-colors`}
+            } rounded-full text-white transition-colors cursor-pointer`}
             title={isInFavorites ? 'In your favorites' : 'Add to liked movies'}
           >
             <svg
@@ -276,7 +287,7 @@ const MovieCard = memo(function MovieCard({ movie }) {
             onClick={handleMarkAsWatched}
             className={`p-1.5 ${
               isWatched ? 'bg-green-500/80' : 'bg-black/70 hover:bg-[#333]'
-            } rounded-full text-white transition-colors`}
+            } rounded-full text-white transition-colors cursor-pointer`}
             title={isWatched ? 'Watched' : 'Mark as watched'}
           >
             <svg

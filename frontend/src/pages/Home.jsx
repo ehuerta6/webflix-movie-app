@@ -57,6 +57,7 @@ function Home() {
     removeFromWatched,
     addToFavorites,
     removeFromFavorites,
+    fetchUserProfile,
   } = useAuth()
 
   // Format movie data to be consistent with MovieCard component
@@ -193,6 +194,9 @@ function Home() {
         )
         console.log('Successfully added to watchlist!')
       }
+
+      // Refresh user profile to update UI
+      await fetchUserProfile()
     } catch (error) {
       console.error('Error handling watchlist:', error)
     }
@@ -239,6 +243,9 @@ function Home() {
         )
         console.log('Successfully added to favorites!')
       }
+
+      // Refresh user profile to update UI
+      await fetchUserProfile()
     } catch (error) {
       console.error('Error handling favorites:', error)
     }
@@ -285,6 +292,9 @@ function Home() {
         )
         console.log('Successfully marked as watched!')
       }
+
+      // Refresh user profile to update UI
+      await fetchUserProfile()
     } catch (error) {
       console.error('Error handling watched status:', error)
     }
@@ -509,7 +519,7 @@ function Home() {
               >
                 <Link
                   to={`/${movie.type}/${movie.id}`}
-                  className="primary-button flex items-center gap-1 group"
+                  className="primary-button flex items-center gap-1 group cursor-pointer"
                 >
                   <span className="transform transition-transform group-hover:scale-110">
                     ▶
@@ -521,13 +531,13 @@ function Home() {
                   <>
                     <button
                       onClick={() => handleAddToWatchlist(movie)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer ${
                         userProfile?.watchlist?.some(
                           (item) =>
                             item.id === movie.id && item.type === movie.type
                         )
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-800 text-white'
+                          ? 'bg-[#5ccfee] text-black'
+                          : 'bg-gray-800 text-white hover:bg-gray-700'
                       }`}
                     >
                       <svg
@@ -554,13 +564,13 @@ function Home() {
 
                     <button
                       onClick={() => handleMarkAsWatched(movie)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer ${
                         userProfile?.watched?.some(
                           (item) =>
                             item.id === movie.id && item.type === movie.type
                         )
                           ? 'bg-green-600 text-white'
-                          : 'bg-gray-800 text-white'
+                          : 'bg-gray-800 text-white hover:bg-gray-700'
                       }`}
                     >
                       <svg
@@ -587,13 +597,13 @@ function Home() {
 
                     <button
                       onClick={() => handleAddToFavorites(movie)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer ${
                         userProfile?.favorites?.some(
                           (item) =>
                             item.id === movie.id && item.type === movie.type
                         )
                           ? 'bg-red-600 text-white'
-                          : 'bg-gray-800 text-white'
+                          : 'bg-gray-800 text-white hover:bg-gray-700'
                       }`}
                     >
                       <svg
@@ -635,7 +645,7 @@ function Home() {
                     <button
                       key={index}
                       onClick={() => changeFeaturedItem(index)}
-                      className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                      className={`w-2.5 h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
                         index === currentFeaturedIndex
                           ? 'bg-[#5ccfee] w-5'
                           : 'bg-gray-600 hover:bg-gray-500'
@@ -653,7 +663,7 @@ function Home() {
             <>
               <button
                 onClick={goToPrev}
-                className="absolute left-2 md:left-6 top-1/2 transform -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full focus:outline-none transition-all duration-200 hover:scale-110"
+                className="absolute left-2 md:left-6 top-1/2 transform -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full focus:outline-none transition-all duration-200 hover:scale-110 cursor-pointer"
                 aria-label="Previous featured item"
               >
                 <svg
@@ -673,7 +683,7 @@ function Home() {
               </button>
               <button
                 onClick={goToNext}
-                className="absolute right-2 md:right-6 top-1/2 transform -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full focus:outline-none transition-all duration-200 hover:scale-110"
+                className="absolute right-2 md:right-6 top-1/2 transform -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full focus:outline-none transition-all duration-200 hover:scale-110 cursor-pointer"
                 aria-label="Next featured item"
               >
                 <svg
