@@ -205,13 +205,23 @@ export function AuthProvider({ children }) {
                 const data = JSON.parse(doc.data().data || '{}')
                 return {
                   id: doc.id,
-                  type: data.media_type || 'movie',
+                  type: data.media_type || data.type || 'movie',
                   title: data.title || data.name || 'Unknown',
-                  poster: data.poster_path,
-                  rating: data.vote_average,
+                  poster: data.poster_path
+                    ? `https://image.tmdb.org/t/p/w342${data.poster_path}`
+                    : data.poster || null,
+                  poster_path: data.poster_path || null,
+                  rating: data.vote_average || data.rating || 'N/A',
                   year: data.release_date
                     ? data.release_date.split('-')[0]
+                    : data.first_air_date
+                    ? data.first_air_date.split('-')[0]
                     : 'N/A',
+                  genre:
+                    data.genres && data.genres.length > 0
+                      ? data.genres[0]
+                      : 'Drama',
+                  addedAt: doc.data().addedAt || new Date().toISOString(),
                 }
               } catch (parseError) {
                 console.error('Error parsing watchlist item:', parseError)
@@ -244,14 +254,23 @@ export function AuthProvider({ children }) {
                 const data = JSON.parse(doc.data().data || '{}')
                 return {
                   id: doc.id,
-                  type: data.media_type || 'movie',
+                  type: data.media_type || data.type || 'movie',
                   title: data.title || data.name || 'Unknown',
-                  poster: data.poster_path,
-                  rating: data.vote_average,
+                  poster: data.poster_path
+                    ? `https://image.tmdb.org/t/p/w342${data.poster_path}`
+                    : data.poster || null,
+                  poster_path: data.poster_path || null,
+                  rating: data.vote_average || data.rating || 'N/A',
                   year: data.release_date
                     ? data.release_date.split('-')[0]
+                    : data.first_air_date
+                    ? data.first_air_date.split('-')[0]
                     : 'N/A',
-                  watchedAt: doc.data().watchedAt,
+                  genre:
+                    data.genres && data.genres.length > 0
+                      ? data.genres[0]
+                      : 'Drama',
+                  watchedAt: doc.data().watchedAt || new Date().toISOString(),
                 }
               } catch (parseError) {
                 console.error('Error parsing watched item:', parseError)
@@ -281,14 +300,23 @@ export function AuthProvider({ children }) {
                 const data = JSON.parse(doc.data().data || '{}')
                 return {
                   id: doc.id,
-                  type: data.media_type || 'movie',
+                  type: data.media_type || data.type || 'movie',
                   title: data.title || data.name || 'Unknown',
-                  poster: data.poster_path,
-                  rating: data.vote_average,
+                  poster: data.poster_path
+                    ? `https://image.tmdb.org/t/p/w342${data.poster_path}`
+                    : data.poster || null,
+                  poster_path: data.poster_path || null,
+                  rating: data.vote_average || data.rating || 'N/A',
                   year: data.release_date
                     ? data.release_date.split('-')[0]
+                    : data.first_air_date
+                    ? data.first_air_date.split('-')[0]
                     : 'N/A',
-                  addedAt: doc.data().addedAt,
+                  genre:
+                    data.genres && data.genres.length > 0
+                      ? data.genres[0]
+                      : 'Drama',
+                  addedAt: doc.data().addedAt || new Date().toISOString(),
                 }
               } catch (parseError) {
                 console.error('Error parsing favorites item:', parseError)
@@ -449,22 +477,70 @@ export function AuthProvider({ children }) {
       const media =
         typeof mediaData === 'string' ? JSON.parse(mediaData) : mediaData
 
+      // Format genre information if available
+      let genreNames = []
+      if (media.genres && Array.isArray(media.genres)) {
+        // Direct genre objects from API
+        genreNames = media.genres.map((g) => g.name)
+      } else if (media.genre_ids && Array.isArray(media.genre_ids)) {
+        // Just genre IDs - use common genre map
+        const genreMap = {
+          28: 'Action',
+          12: 'Adventure',
+          16: 'Animation',
+          35: 'Comedy',
+          80: 'Crime',
+          99: 'Documentary',
+          18: 'Drama',
+          10751: 'Family',
+          14: 'Fantasy',
+          36: 'History',
+          27: 'Horror',
+          10402: 'Music',
+          9648: 'Mystery',
+          10749: 'Romance',
+          878: 'Science Fiction',
+          10770: 'TV Movie',
+          53: 'Thriller',
+          10752: 'War',
+          37: 'Western',
+          10759: 'Action & Adventure',
+          10762: 'Kids',
+          10763: 'News',
+          10764: 'Reality',
+          10765: 'Sci-Fi & Fantasy',
+          10766: 'Soap',
+          10767: 'Talk',
+          10768: 'War & Politics',
+        }
+        genreNames = media.genre_ids
+          .map((id) => genreMap[id] || 'Unknown')
+          .filter((name) => name !== 'Unknown')
+      }
+
       const mediaItem = {
         id: media.id,
-        type: media.media_type || media.type,
-        title: media.title || media.name,
+        type: media.media_type || media.type || 'movie',
+        title: media.title || media.name || 'Unknown Title',
+        poster_path: media.poster_path,
         poster: media.poster_path
           ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
           : null,
+        backdrop_path: media.backdrop_path,
         backdrop: media.backdrop_path
           ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`
           : null,
+        vote_average: media.vote_average,
         rating: media.vote_average ? media.vote_average.toFixed(1) : '0.0',
+        release_date: media.release_date || media.first_air_date,
         year: media.release_date
           ? media.release_date.split('-')[0]
           : media.first_air_date
           ? media.first_air_date.split('-')[0]
           : 'N/A',
+        genres: genreNames,
+        genre: genreNames.length > 0 ? genreNames[0] : 'Drama',
+        overview: media.overview || '',
       }
 
       console.log('Adding to favorites:', mediaItem)
@@ -548,22 +624,70 @@ export function AuthProvider({ children }) {
       const media =
         typeof mediaData === 'string' ? JSON.parse(mediaData) : mediaData
 
+      // Format genre information if available
+      let genreNames = []
+      if (media.genres && Array.isArray(media.genres)) {
+        // Direct genre objects from API
+        genreNames = media.genres.map((g) => g.name)
+      } else if (media.genre_ids && Array.isArray(media.genre_ids)) {
+        // Just genre IDs - use common genre map
+        const genreMap = {
+          28: 'Action',
+          12: 'Adventure',
+          16: 'Animation',
+          35: 'Comedy',
+          80: 'Crime',
+          99: 'Documentary',
+          18: 'Drama',
+          10751: 'Family',
+          14: 'Fantasy',
+          36: 'History',
+          27: 'Horror',
+          10402: 'Music',
+          9648: 'Mystery',
+          10749: 'Romance',
+          878: 'Science Fiction',
+          10770: 'TV Movie',
+          53: 'Thriller',
+          10752: 'War',
+          37: 'Western',
+          10759: 'Action & Adventure',
+          10762: 'Kids',
+          10763: 'News',
+          10764: 'Reality',
+          10765: 'Sci-Fi & Fantasy',
+          10766: 'Soap',
+          10767: 'Talk',
+          10768: 'War & Politics',
+        }
+        genreNames = media.genre_ids
+          .map((id) => genreMap[id] || 'Unknown')
+          .filter((name) => name !== 'Unknown')
+      }
+
       const mediaItem = {
         id: media.id,
-        type: media.media_type || media.type,
-        title: media.title || media.name,
+        type: media.media_type || media.type || 'movie',
+        title: media.title || media.name || 'Unknown Title',
+        poster_path: media.poster_path,
         poster: media.poster_path
           ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
           : null,
+        backdrop_path: media.backdrop_path,
         backdrop: media.backdrop_path
           ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`
           : null,
+        vote_average: media.vote_average,
         rating: media.vote_average ? media.vote_average.toFixed(1) : '0.0',
+        release_date: media.release_date || media.first_air_date,
         year: media.release_date
           ? media.release_date.split('-')[0]
           : media.first_air_date
           ? media.first_air_date.split('-')[0]
           : 'N/A',
+        genres: genreNames,
+        genre: genreNames.length > 0 ? genreNames[0] : 'Drama',
+        overview: media.overview || '',
       }
 
       console.log('Adding to watched movies:', mediaItem)

@@ -514,7 +514,28 @@ function Details() {
                     <span>▶</span> Watch Trailer
                   </a>
                 )}
-                <MediaActions />
+                <MediaActions
+                  mediaData={{
+                    ...details,
+                    media_type: type, // Ensure we have the media_type field
+                    poster_path: details.poster?.includes('image.tmdb.org')
+                      ? details.poster.split('image.tmdb.org/t/p/w500')[1]
+                      : details.poster,
+                    vote_average: parseFloat(details.rating),
+                    release_date: details.year
+                      ? `${details.year}-01-01`
+                      : undefined,
+                    genre_ids: details.genres
+                      ?.map(
+                        (genre) =>
+                          Object.entries(genreMap).find(
+                            ([, name]) => name === genre
+                          )?.[0]
+                      )
+                      .filter(Boolean),
+                    overview: details.description,
+                  }}
+                />
               </div>
 
               {/* Additional Info Grid */}

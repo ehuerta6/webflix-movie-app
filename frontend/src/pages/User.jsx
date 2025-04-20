@@ -5,23 +5,45 @@ import { useAuth } from '../context/AuthContext'
 
 // MovieCard component for reuse in different collections
 const MovieCard = ({ movie, actions }) => {
-  if (!movie.poster || !movie.title) return null
+  const [imageLoaded, setImageLoaded] = useState(false)
+
+  if (!movie || !movie.id) return null
+
+  // Format the poster URL properly
+  const posterUrl =
+    movie.poster && movie.poster.includes('http')
+      ? movie.poster
+      : movie.poster_path
+      ? `https://image.tmdb.org/t/p/w342${movie.poster_path}`
+      : 'https://via.placeholder.com/342x513?text=No+Image'
 
   return (
     <div className="bg-[#1e1e1e] rounded overflow-hidden flex-shrink-0 hover:translate-y-[-4px] transition-transform duration-200 w-36">
       <div className="w-full h-48 relative">
         <img
-          src={movie.poster}
-          alt={movie.title}
-          className="w-full h-full object-cover"
+          src={posterUrl}
+          alt={movie.title || 'Movie'}
+          className={`w-full h-full object-cover transition-opacity duration-300 ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+          onLoad={() => setImageLoaded(true)}
           onError={(e) => {
             e.target.src = 'https://via.placeholder.com/342x513?text=No+Image'
           }}
           loading="lazy"
         />
+        {!imageLoaded && (
+          <div className="absolute inset-0 bg-[#333] flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-[#5ccfee] border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
         {movie.rating && (
           <div className="absolute top-0 right-0 bg-black/50 px-1.5 py-0.5 m-1.5 rounded text-xs">
-            <span className="text-[#5ccfee]">{movie.rating}</span>
+            <span className="text-[#5ccfee]">
+              {typeof movie.rating === 'number'
+                ? movie.rating.toFixed(1)
+                : movie.rating}
+            </span>
           </div>
         )}
         {movie.genre && (
@@ -34,9 +56,9 @@ const MovieCard = ({ movie, actions }) => {
       </div>
       <div className="p-2">
         <h4 className="font-medium text-gray-200 text-sm mb-0.5 truncate">
-          {movie.title}
+          {movie.title || 'Unknown Title'}
         </h4>
-        <p className="text-gray-400 text-xs">{movie.year}</p>
+        <p className="text-gray-400 text-xs">{movie.year || 'N/A'}</p>
         {actions && <div className="mt-1 flex justify-between">{actions}</div>}
       </div>
     </div>
@@ -136,6 +158,7 @@ function User() {
     if (userProfile) {
       const favorites = userProfile.favorites || []
       const watchlist = userProfile.watchlist || []
+      const watched = userProfile.watched || []
 
       const movieFavorites = favorites.filter(
         (item) => item.type === 'movie'
@@ -149,10 +172,14 @@ function User() {
       const showWatchlist = watchlist.filter(
         (item) => item.type === 'tv'
       ).length
+      const movieWatched = watched.filter(
+        (item) => item.type === 'movie'
+      ).length
+      const showWatched = watched.filter((item) => item.type === 'tv').length
 
       setUserStats({
-        movieCount: movieFavorites + movieWatchlist,
-        showCount: showFavorites + showWatchlist,
+        movieCount: movieFavorites + movieWatchlist + movieWatched,
+        showCount: showFavorites + showWatchlist + showWatched,
       })
     }
   }, [userProfile])
@@ -225,7 +252,7 @@ function User() {
   useEffect(() => {
     if (!userProfile) return
 
-    console.log('User profile data updated:', userProfile)
+    console.log('Processing user profile data:', userProfile)
 
     try {
       // Format favorites data
@@ -237,26 +264,76 @@ function User() {
 
         const formattedFavorites = userProfile.favorites
           .filter((item) => item && item.id) // Ensure the item is valid
-          .map((movie) => ({
-            id: movie.id,
-            title: movie.title || 'Unknown Title',
-            poster:
-              movie.poster && movie.poster.startsWith('http')
-                ? movie.poster
-                : movie.poster_path
-                ? `https://image.tmdb.org/t/p/w342${movie.poster_path}`
-                : 'https://via.placeholder.com/342x513?text=No+Image',
-            year:
-              movie.year ||
-              (movie.release_date ? movie.release_date.substring(0, 4) : 'N/A'),
-            rating:
-              movie.rating ||
-              (movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'),
-            genre: movie.genre || 'Drama',
-          }))
+          .map((movie) => {
+            console.log('Processing favorite movie:', movie) // Add this log
+            // Extract genre from various possible formats
+            let genre = 'Drama'
+
+            // First check if the raw data has genres property (could be from parsed JSON)
+            if (movie.genres) {
+              if (Array.isArray(movie.genres)) {
+                if (movie.genres.length > 0) {
+                  // Could be array of objects with name
+                  if (
+                    typeof movie.genres[0] === 'object' &&
+                    movie.genres[0].name
+                  ) {
+                    genre = movie.genres[0].name
+                  }
+                  // Or array of strings
+                  else if (typeof movie.genres[0] === 'string') {
+                    genre = movie.genres[0]
+                  }
+                }
+              }
+              // Could be a string that needs parsing
+              else if (typeof movie.genres === 'string') {
+                try {
+                  const parsedGenres = JSON.parse(movie.genres)
+                  if (Array.isArray(parsedGenres) && parsedGenres.length > 0) {
+                    if (
+                      typeof parsedGenres[0] === 'object' &&
+                      parsedGenres[0].name
+                    ) {
+                      genre = parsedGenres[0].name
+                    } else {
+                      genre = String(parsedGenres[0])
+                    }
+                  }
+                } catch {
+                  // Not JSON, just use the string
+                  genre = movie.genres
+                }
+              }
+            }
+            // Then check if there's a simple genre property
+            else if (movie.genre) {
+              genre = movie.genre
+            }
+
+            return {
+              id: movie.id,
+              title: movie.title || movie.name || 'Unknown Title',
+              // Handle different poster formats
+              poster: movie.poster || null,
+              poster_path:
+                movie.poster_path ||
+                (movie.poster && !movie.poster.includes('http')
+                  ? movie.poster
+                  : null),
+              year:
+                movie.year ||
+                (movie.release_date
+                  ? movie.release_date.substring(0, 4)
+                  : 'N/A'),
+              rating: movie.rating || movie.vote_average || 'N/A',
+              genre: genre,
+              type: movie.type || movie.media_type || 'movie',
+            }
+          })
 
         setLikedMovies(formattedFavorites)
-        console.log('Formatted favorites:', formattedFavorites.length)
+        console.log('Formatted favorites:', formattedFavorites)
       } else {
         setLikedMovies([])
         console.log('No favorites found in user profile')
@@ -272,38 +349,81 @@ function User() {
         const formattedWatchlist = userProfile.watchlist
           .filter((item) => item && item.id) // Ensure the item is valid
           .map((movie) => {
-            // Extract image path from poster field
-            let posterPath = movie.poster || movie.poster_path
-            if (posterPath && !posterPath.startsWith('http')) {
-              posterPath = `https://image.tmdb.org/t/p/w342${posterPath}`
+            console.log('Processing watchlist movie:', movie) // Add this log
+            // Extract genre from various possible formats
+            let genre = 'Drama'
+
+            // First check if the raw data has genres property (could be from parsed JSON)
+            if (movie.genres) {
+              if (Array.isArray(movie.genres)) {
+                if (movie.genres.length > 0) {
+                  // Could be array of objects with name
+                  if (
+                    typeof movie.genres[0] === 'object' &&
+                    movie.genres[0].name
+                  ) {
+                    genre = movie.genres[0].name
+                  }
+                  // Or array of strings
+                  else if (typeof movie.genres[0] === 'string') {
+                    genre = movie.genres[0]
+                  }
+                }
+              }
+              // Could be a string that needs parsing
+              else if (typeof movie.genres === 'string') {
+                try {
+                  const parsedGenres = JSON.parse(movie.genres)
+                  if (Array.isArray(parsedGenres) && parsedGenres.length > 0) {
+                    if (
+                      typeof parsedGenres[0] === 'object' &&
+                      parsedGenres[0].name
+                    ) {
+                      genre = parsedGenres[0].name
+                    } else {
+                      genre = String(parsedGenres[0])
+                    }
+                  }
+                } catch {
+                  // Not JSON, just use the string
+                  genre = movie.genres
+                }
+              }
+            }
+            // Then check if there's a simple genre property
+            else if (movie.genre) {
+              genre = movie.genre
             }
 
             return {
               id: movie.id,
-              title: movie.title || 'Unknown Title',
-              poster:
-                posterPath ||
-                'https://via.placeholder.com/342x513?text=No+Image',
+              title: movie.title || movie.name || 'Unknown Title',
+              // Handle different poster formats
+              poster: movie.poster || null,
+              poster_path:
+                movie.poster_path ||
+                (movie.poster && !movie.poster.includes('http')
+                  ? movie.poster
+                  : null),
               year:
                 movie.year ||
                 (movie.release_date
                   ? movie.release_date.substring(0, 4)
                   : 'N/A'),
-              rating:
-                movie.rating ||
-                (movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'),
-              genre: movie.genre || 'Drama',
+              rating: movie.rating || movie.vote_average || 'N/A',
+              genre: genre,
+              type: movie.type || movie.media_type || 'movie',
             }
           })
 
         setWatchlistMovies(formattedWatchlist)
-        console.log('Formatted watchlist movies:', formattedWatchlist.length)
+        console.log('Formatted watchlist movies:', formattedWatchlist)
       } else {
         setWatchlistMovies([])
         console.log('No watchlist items found in user profile')
       }
 
-      // Format watched movies data
+      // Format watched movies data - use the same improved genre extraction
       if (userProfile.watched && userProfile.watched.length > 0) {
         console.log(
           'Processing watched movies from Firestore:',
@@ -313,33 +433,76 @@ function User() {
         const formattedWatched = userProfile.watched
           .filter((item) => item && item.id) // Ensure the item is valid
           .map((movie) => {
-            // Extract image path from poster field
-            let posterPath = movie.poster || movie.poster_path
-            if (posterPath && !posterPath.startsWith('http')) {
-              posterPath = `https://image.tmdb.org/t/p/w342${posterPath}`
+            console.log('Processing watched movie:', movie) // Add this log
+            // Extract genre from various possible formats
+            let genre = 'Drama'
+
+            // First check if the raw data has genres property (could be from parsed JSON)
+            if (movie.genres) {
+              if (Array.isArray(movie.genres)) {
+                if (movie.genres.length > 0) {
+                  // Could be array of objects with name
+                  if (
+                    typeof movie.genres[0] === 'object' &&
+                    movie.genres[0].name
+                  ) {
+                    genre = movie.genres[0].name
+                  }
+                  // Or array of strings
+                  else if (typeof movie.genres[0] === 'string') {
+                    genre = movie.genres[0]
+                  }
+                }
+              }
+              // Could be a string that needs parsing
+              else if (typeof movie.genres === 'string') {
+                try {
+                  const parsedGenres = JSON.parse(movie.genres)
+                  if (Array.isArray(parsedGenres) && parsedGenres.length > 0) {
+                    if (
+                      typeof parsedGenres[0] === 'object' &&
+                      parsedGenres[0].name
+                    ) {
+                      genre = parsedGenres[0].name
+                    } else {
+                      genre = String(parsedGenres[0])
+                    }
+                  }
+                } catch {
+                  // Not JSON, just use the string
+                  genre = movie.genres
+                }
+              }
+            }
+            // Then check if there's a simple genre property
+            else if (movie.genre) {
+              genre = movie.genre
             }
 
             return {
               id: movie.id,
-              title: movie.title || 'Unknown Title',
-              poster:
-                posterPath ||
-                'https://via.placeholder.com/342x513?text=No+Image',
+              title: movie.title || movie.name || 'Unknown Title',
+              // Handle different poster formats
+              poster: movie.poster || null,
+              poster_path:
+                movie.poster_path ||
+                (movie.poster && !movie.poster.includes('http')
+                  ? movie.poster
+                  : null),
               year:
                 movie.year ||
                 (movie.release_date
                   ? movie.release_date.substring(0, 4)
                   : 'N/A'),
-              rating:
-                movie.rating ||
-                (movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'),
-              genre: movie.genre || 'Drama',
+              rating: movie.rating || movie.vote_average || 'N/A',
+              genre: genre,
+              type: movie.type || movie.media_type || 'movie',
               watchedAt: movie.watchedAt || 'N/A',
             }
           })
 
         setWatchedMovies(formattedWatched)
-        console.log('Formatted watched movies:', formattedWatched.length)
+        console.log('Formatted watched movies:', formattedWatched)
       } else {
         setWatchedMovies([])
         console.log('No watched movies found in user profile')
