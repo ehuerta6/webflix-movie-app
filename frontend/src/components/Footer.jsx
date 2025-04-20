@@ -12,7 +12,8 @@ function Footer() {
               <span className="text-[#00BFFF] font-semibold">
                 Technologies used:
               </span>{' '}
-              React, React Router, Tailwind CSS, TMDB API, Vite
+              React, React Router, Tailwind CSS, TMDB API, Vite, Firebase,
+              Firestore
             </p>
           </div>
           <div className="text-center md:text-right">
