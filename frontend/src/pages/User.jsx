@@ -4,6 +4,71 @@ import { fetchGenres } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import MovieCard from '../components/MovieCard'
 
+// Rainbow colors array for the user to choose from
+const RAINBOW_COLORS = [
+  { name: 'Red', bg: 'from-red-500 to-red-600', profile: 'bg-red-500' },
+  {
+    name: 'Orange',
+    bg: 'from-orange-500 to-orange-600',
+    profile: 'bg-orange-500',
+  },
+  {
+    name: 'Yellow',
+    bg: 'from-yellow-500 to-yellow-600',
+    profile: 'bg-yellow-500',
+  },
+  { name: 'Green', bg: 'from-green-500 to-green-600', profile: 'bg-green-500' },
+  { name: 'Blue', bg: 'from-blue-500 to-blue-600', profile: 'bg-blue-500' },
+  {
+    name: 'Indigo',
+    bg: 'from-indigo-500 to-indigo-600',
+    profile: 'bg-indigo-500',
+  },
+  {
+    name: 'Violet',
+    bg: 'from-purple-500 to-purple-600',
+    profile: 'bg-purple-500',
+  },
+  { name: 'Teal', bg: 'from-[#00BFFF] to-[#5ccfee]', profile: 'bg-[#5ccfee]' }, // Default color
+]
+
+// Default colors
+const DEFAULT_PROFILE_COLOR = '#5ccfee'
+const DEFAULT_BANNER_COLOR = '#00BFFF'
+
+// Color utility function to convert HEX to tailwind-compatible format for background
+const colorToTailwindBg = (color) => {
+  if (!color.startsWith('#')) color = '#' + color
+  return `bg-[${color}]`
+}
+
+// Generate gradient from a single color using tailwind classes
+const generateGradient = (color) => {
+  if (!color.startsWith('#')) color = '#' + color
+  // Get a slightly darker variant for the gradient
+  const darkerHex = darkenColor(color, 20)
+  return `from-[${color}] to-[${darkerHex}]`
+}
+
+// Function to darken a hex color
+const darkenColor = (hex, percent) => {
+  // Remove the # if present
+  hex = hex.replace('#', '')
+
+  // Parse the hex color to RGB
+  let r = parseInt(hex.substring(0, 2), 16)
+  let g = parseInt(hex.substring(2, 4), 16)
+  let b = parseInt(hex.substring(4, 6), 16)
+
+  // Darken each channel
+  r = Math.floor((r * (100 - percent)) / 100)
+  g = Math.floor((g * (100 - percent)) / 100)
+  b = Math.floor((b * (100 - percent)) / 100)
+
+  // Convert back to hex
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
+}
+
 // GenreToggle component for selecting genres
 const GenreToggle = ({ genre, selected, onToggle }) => (
   <button
@@ -68,6 +133,7 @@ function User() {
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [availableGenres, setAvailableGenres] = useState([])
+  const [isProfileReady, setIsProfileReady] = useState(false)
 
   // Form state - initialize once we have userProfile
   const [editForm, setEditForm] = useState({
@@ -75,6 +141,10 @@ function User() {
     username: '',
     bio: '',
     selectedGenres: [],
+    profileColor: '',
+    bannerColor: '',
+    rawProfileColor: '#5ccfee', // Raw hex color for the color picker
+    rawBannerColor: '#00BFFF', // Raw hex color for the banner picker
   })
 
   const [settingsForm, setSettingsForm] = useState({
@@ -120,19 +190,46 @@ function User() {
     if (currentUser?.uid) {
       setLoading((prev) => ({ ...prev, profile: true }))
       fetchUserProfile()
-        .then(() => setLoading((prev) => ({ ...prev, profile: false })))
-        .catch(() => setLoading((prev) => ({ ...prev, profile: false })))
+        .then(() => {
+          setLoading((prev) => ({ ...prev, profile: false }))
+          setIsProfileReady(true)
+        })
+        .catch(() => {
+          setLoading((prev) => ({ ...prev, profile: false }))
+          setIsProfileReady(true)
+        })
     }
   }, [currentUser?.uid])
 
+  // Extract hex color from Tailwind class
+  const extractColorFromClass = (colorClass) => {
+    if (!colorClass) return DEFAULT_PROFILE_COLOR
+    // Extract hex color from classes like bg-[#color] or from-[#color]
+    const match = colorClass.match(/\[(#[0-9A-Fa-f]{6})\]/)
+    return match ? match[1] : DEFAULT_PROFILE_COLOR
+  }
+
   // Initialize form data when userProfile changes
   useEffect(() => {
-    if (userProfile && isEditingProfile) {
+    if (isEditingProfile) {
+      // Extract raw colors from Tailwind classes if they exist
+      const profileRawColor =
+        extractColorFromClass(userProfile?.profileColor) ||
+        DEFAULT_PROFILE_COLOR
+      const bannerRawColor =
+        extractColorFromClass(userProfile?.bannerColor) || DEFAULT_BANNER_COLOR
+
       setEditForm({
-        name: userProfile.displayName || '',
-        username: userProfile.username || '',
-        bio: userProfile.bio || '',
-        selectedGenres: userProfile.favoriteGenres || [],
+        name: userProfile?.displayName || '',
+        username: userProfile?.username || '',
+        bio: userProfile?.bio || '',
+        selectedGenres: userProfile?.favoriteGenres || [],
+        profileColor:
+          userProfile?.profileColor || colorToTailwindBg(DEFAULT_PROFILE_COLOR),
+        bannerColor:
+          userProfile?.bannerColor || generateGradient(DEFAULT_BANNER_COLOR),
+        rawProfileColor: profileRawColor,
+        rawBannerColor: bannerRawColor,
       })
     }
 
@@ -558,12 +655,29 @@ function User() {
   const handleGoBack = () => navigate(-1)
 
   const handleProfileEdit = () => {
+    // Get raw colors - either from the userProfile object or extract from Tailwind classes
+    const rawProfileColor =
+      userProfile?.rawProfileColor ||
+      extractColorFromClass(userProfile?.profileColor) ||
+      DEFAULT_PROFILE_COLOR
+
+    const rawBannerColor =
+      userProfile?.rawBannerColor ||
+      extractColorFromClass(userProfile?.bannerColor) ||
+      DEFAULT_BANNER_COLOR
+
     // Initialize the form with current userProfile data
     setEditForm({
       name: userProfile?.displayName || '',
       username: userProfile?.username || '',
       bio: userProfile?.bio || '',
       selectedGenres: userProfile?.favoriteGenres || [],
+      profileColor:
+        userProfile?.profileColor || colorToTailwindBg(DEFAULT_PROFILE_COLOR),
+      bannerColor:
+        userProfile?.bannerColor || generateGradient(DEFAULT_BANNER_COLOR),
+      rawProfileColor: rawProfileColor,
+      rawBannerColor: rawBannerColor,
     })
     setIsEditingProfile(true)
     setProfileError('')
@@ -611,16 +725,39 @@ function User() {
       return
     }
 
+    // Validate color format
+    const hexRegex = /^#[0-9A-Fa-f]{6}$/
+    if (
+      !hexRegex.test(editForm.rawProfileColor) ||
+      !hexRegex.test(editForm.rawBannerColor)
+    ) {
+      setProfileError('Invalid color format. Please use valid hex colors.')
+      return
+    }
+
     setLoading((prev) => ({ ...prev, profile: true }))
     setProfileSubmitting(true)
     setProfileError('') // Clear any errors
 
     try {
-      // First update the user profile data (except genres)
+      // Store both raw color values and Tailwind classes
+      // This ensures backward compatibility and provides raw values for extraction
+      const rawProfileColor = editForm.rawProfileColor
+      const rawBannerColor = editForm.rawBannerColor
+
+      // Convert to Tailwind classes
+      const profileColor = colorToTailwindBg(rawProfileColor)
+      const bannerColor = generateGradient(rawBannerColor)
+
+      // Update the user profile data with both raw and formatted values
       const profileData = {
         displayName: editForm.name,
         username: editForm.username,
         bio: editForm.bio,
+        profileColor: profileColor,
+        bannerColor: bannerColor,
+        rawProfileColor: rawProfileColor,
+        rawBannerColor: rawBannerColor,
       }
 
       console.log('Updating user profile in Firestore:', profileData)
@@ -635,11 +772,27 @@ function User() {
         await updateFavoriteGenres(newGenres)
       }
 
+      // Update local userProfile to reflect the changes immediately
+      setUserProfile((prev) => ({
+        ...prev,
+        displayName: editForm.name,
+        username: editForm.username,
+        bio: editForm.bio,
+        profileColor: profileColor,
+        bannerColor: bannerColor,
+        rawProfileColor: rawProfileColor,
+        rawBannerColor: rawBannerColor,
+      }))
+
       // Success! Close the editing form
       setIsEditingProfile(false)
 
       // Display success message (could be implemented with a toast notification)
-      console.log('Profile successfully updated')
+      console.log(
+        'Profile successfully updated with colors:',
+        profileColor,
+        bannerColor
+      )
     } catch (error) {
       console.error('Error updating profile:', error)
       setProfileError(error.message || 'Failed to update profile')
@@ -1106,6 +1259,48 @@ function User() {
     </div>
   )
 
+  // Handle color selection for profile and banner
+  const handleColorChange = (e) => {
+    const { name, value } = e.target
+    let colorHex = value
+
+    // Ensure hex has # prefix
+    if (!colorHex.startsWith('#') && colorHex.length > 0) {
+      colorHex = '#' + colorHex
+    }
+
+    // Check if it's a valid hex color
+    const isValidHex = /^#([0-9A-Fa-f]{3}){1,2}$/.test(colorHex)
+
+    if (name === 'rawProfileColor') {
+      // Always update the raw color
+      const newState = {
+        ...editForm,
+        rawProfileColor: colorHex,
+      }
+
+      // Only update the Tailwind class if it's a valid hex
+      if (isValidHex) {
+        newState.profileColor = colorToTailwindBg(colorHex)
+      }
+
+      setEditForm(newState)
+    } else if (name === 'rawBannerColor') {
+      // Always update the raw color
+      const newState = {
+        ...editForm,
+        rawBannerColor: colorHex,
+      }
+
+      // Only update the Tailwind class if it's a valid hex
+      if (isValidHex) {
+        newState.bannerColor = generateGradient(colorHex)
+      }
+
+      setEditForm(newState)
+    }
+  }
+
   if (!currentUser) {
     navigate('/login')
     return null
@@ -1199,16 +1394,67 @@ function User() {
 
             {/* User info card */}
             <div className="bg-[#1a1a1a] rounded-lg overflow-hidden">
-              {/* Profile header with background */}
-              <div className="h-32 bg-gradient-to-r from-[#00BFFF] to-[#5ccfee] relative">
-                <div className="absolute -bottom-12 left-8 h-24 w-24 bg-[#1a1a1a] rounded-full border-4 border-[#1a1a1a] overflow-hidden">
-                  <div className="h-full w-full bg-[#5ccfee] flex items-center justify-center text-3xl font-bold text-[#1a1a1a]">
-                    {userProfile?.displayName?.charAt(0).toUpperCase() ||
-                      currentUser?.email?.charAt(0).toUpperCase() ||
-                      'U'}
+              {/* Profile header with background - show loading state until ready */}
+              {!isProfileReady && !isEditingProfile ? (
+                <div className="h-32 bg-gradient-to-r from-gray-700 to-gray-800 animate-pulse relative">
+                  <div className="absolute -bottom-12 left-8 h-24 w-24 bg-[#1a1a1a] rounded-full border-4 border-[#1a1a1a] overflow-hidden">
+                    <div className="h-full w-full bg-gray-600 flex items-center justify-center">
+                      <div className="w-8 h-8 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div
+                  className={
+                    isEditingProfile ? 'h-32 relative' : 'h-32 relative'
+                  }
+                  style={
+                    isEditingProfile
+                      ? {
+                          background: `linear-gradient(to right, ${
+                            editForm.rawBannerColor || '#00BFFF'
+                          }, ${darkenColor(
+                            editForm.rawBannerColor || '#00BFFF',
+                            20
+                          )})`,
+                        }
+                      : {
+                          background: userProfile?.rawBannerColor
+                            ? `linear-gradient(to right, ${
+                                userProfile.rawBannerColor
+                              }, ${darkenColor(
+                                userProfile.rawBannerColor,
+                                20
+                              )})`
+                            : `linear-gradient(to right, #00BFFF, ${darkenColor(
+                                '#00BFFF',
+                                20
+                              )})`,
+                        }
+                  }
+                >
+                  <div className="absolute -bottom-12 left-8 h-24 w-24 bg-[#1a1a1a] rounded-full border-4 border-[#1a1a1a] overflow-hidden">
+                    <div
+                      className="h-full w-full flex items-center justify-center text-3xl font-bold text-[#1a1a1a]"
+                      style={
+                        isEditingProfile
+                          ? {
+                              backgroundColor:
+                                editForm.rawProfileColor || '#5ccfee',
+                            }
+                          : {
+                              backgroundColor:
+                                userProfile?.rawProfileColor || '#5ccfee',
+                            }
+                      }
+                    >
+                      {userProfile?.displayName?.charAt(0).toUpperCase() ||
+                        currentUser?.email?.charAt(0).toUpperCase() ||
+                        'U'}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Profile content */}
               <div className="pt-16 pb-6 px-8">
@@ -1281,6 +1527,136 @@ function User() {
                     </p>
                   )}
                 </div>
+
+                {/* Color settings section (only in edit mode) */}
+                {isEditingProfile && (
+                  <div className="mb-6">
+                    <h2 className="text-sm font-bold text-gray-300 mb-2">
+                      PROFILE COLORS
+                    </h2>
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      {/* Profile Logo Color Picker */}
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-2">
+                          Profile Logo Color
+                        </label>
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <input
+                              type="color"
+                              name="rawProfileColor"
+                              value={editForm.rawProfileColor || '#5ccfee'}
+                              onChange={handleColorChange}
+                              className="w-10 h-10 rounded-full overflow-hidden appearance-none cursor-pointer"
+                              style={{
+                                opacity: 0,
+                                position: 'absolute',
+                                zIndex: 10,
+                              }}
+                            />
+                            <div
+                              className={`w-10 h-10 rounded-full cursor-pointer border-2 border-white`}
+                              style={{
+                                backgroundColor: editForm.rawProfileColor,
+                              }}
+                            ></div>
+                          </div>
+                          <div className="flex-1">
+                            <div className="relative flex items-center">
+                              <span className="px-3 bg-[#1e1e1e] text-gray-400 absolute">
+                                #
+                              </span>
+                              <input
+                                type="text"
+                                value={(
+                                  editForm.rawProfileColor || '#5ccfee'
+                                ).replace('#', '')}
+                                onChange={(e) =>
+                                  handleColorChange({
+                                    target: {
+                                      name: 'rawProfileColor',
+                                      value: `#${e.target.value}`,
+                                    },
+                                  })
+                                }
+                                className="bg-[#1e1e1e] text-white px-7 py-1 rounded border border-[#333] w-full focus:outline-none focus:ring-1 focus:ring-[#5ccfee]"
+                                placeholder="Color hex code"
+                                maxLength="6"
+                                pattern="[0-9A-Fa-f]{6}"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-400">
+                          Click on the color circle to open the color picker
+                        </div>
+                      </div>
+
+                      {/* Banner Color Picker */}
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-2">
+                          Banner Gradient Color
+                        </label>
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <input
+                              type="color"
+                              name="rawBannerColor"
+                              value={editForm.rawBannerColor || '#00BFFF'}
+                              onChange={handleColorChange}
+                              className="w-10 h-10 rounded cursor-pointer appearance-none"
+                              style={{
+                                opacity: 0,
+                                position: 'absolute',
+                                zIndex: 10,
+                              }}
+                            />
+                            <div
+                              className="w-16 h-10 rounded cursor-pointer border-2 border-white"
+                              style={{
+                                background: `linear-gradient(to right, ${
+                                  editForm.rawBannerColor
+                                }, ${darkenColor(
+                                  editForm.rawBannerColor,
+                                  20
+                                )})`,
+                              }}
+                            ></div>
+                          </div>
+                          <div className="flex-1">
+                            <div className="relative flex items-center">
+                              <span className="px-3 bg-[#1e1e1e] text-gray-400 absolute">
+                                #
+                              </span>
+                              <input
+                                type="text"
+                                value={(
+                                  editForm.rawBannerColor || '#00BFFF'
+                                ).replace('#', '')}
+                                onChange={(e) =>
+                                  handleColorChange({
+                                    target: {
+                                      name: 'rawBannerColor',
+                                      value: `#${e.target.value}`,
+                                    },
+                                  })
+                                }
+                                className="bg-[#1e1e1e] text-white px-7 py-1 rounded border border-[#333] w-full focus:outline-none focus:ring-1 focus:ring-[#5ccfee]"
+                                placeholder="Color hex code"
+                                maxLength="6"
+                                pattern="[0-9A-Fa-f]{6}"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-400">
+                          A gradient will be automatically created from your
+                          selected color
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Display error message for profile form */}
                 {isEditingProfile && profileError && (

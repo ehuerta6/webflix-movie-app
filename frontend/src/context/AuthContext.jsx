@@ -61,12 +61,17 @@ export function AuthProvider({ children }) {
 
       // Create user document in Firestore
       try {
-        // Create an empty user document
+        // Create a new user document with default profile settings
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           uid: userCredential.user.uid,
           displayName,
           email,
           createdAt: new Date().toISOString(),
+          // Add default color settings
+          profileColor: 'bg-[#5ccfee]',
+          bannerColor: 'from-[#00BFFF] to-[#5ccfee]',
+          rawProfileColor: '#5ccfee',
+          rawBannerColor: '#00BFFF',
         })
         console.log('Created user document for:', userCredential.user.uid)
       } catch (error) {
@@ -90,12 +95,17 @@ export function AuthProvider({ children }) {
         const userDoc = await getDoc(doc(db, 'users', result.user.uid))
 
         if (!userDoc.exists()) {
-          // Create user document in Firestore
+          // Create user document in Firestore with default profile settings
           await setDoc(doc(db, 'users', result.user.uid), {
             uid: result.user.uid,
             displayName: result.user.displayName,
             email: result.user.email,
             createdAt: new Date().toISOString(),
+            // Add default color settings
+            profileColor: 'bg-[#5ccfee]',
+            bannerColor: 'from-[#00BFFF] to-[#5ccfee]',
+            rawProfileColor: '#5ccfee',
+            rawBannerColor: '#00BFFF',
           })
           console.log('Created user document for Google user:', result.user.uid)
         }
@@ -345,6 +355,11 @@ export function AuthProvider({ children }) {
           email: currentUser.email,
           bio: '',
           favoriteGenres: [],
+          // Colors for display and storage
+          profileColor: 'bg-[#5ccfee]', // Default profile color (Tailwind)
+          bannerColor: 'from-[#00BFFF] to-[#5ccfee]', // Default banner color gradient (Tailwind)
+          rawProfileColor: '#5ccfee', // Raw hex for profile color
+          rawBannerColor: '#00BFFF', // Raw hex for banner color
           createdAt: new Date().toISOString(),
           watchlist: [],
           favorites: [],
@@ -369,6 +384,11 @@ export function AuthProvider({ children }) {
         email: currentUser.email,
         bio: '',
         favoriteGenres: [],
+        // Colors for display and storage
+        profileColor: 'bg-[#5ccfee]', // Default profile color (Tailwind)
+        bannerColor: 'from-[#00BFFF] to-[#5ccfee]', // Default banner color gradient (Tailwind)
+        rawProfileColor: '#5ccfee', // Raw hex for profile color
+        rawBannerColor: '#00BFFF', // Raw hex for banner color
         watchlist: [],
         favorites: [],
         watched: [],
@@ -402,12 +422,23 @@ export function AuthProvider({ children }) {
         userData = userSnapshot.data()
       }
 
-      // Prepare the updated data
+      // Prepare the updated data - save both raw colors and formatted classes
       const updatedData = {
         ...userData,
         displayName: profileData.displayName || userData.displayName,
         username: profileData.username || userData.username,
         bio: profileData.bio !== undefined ? profileData.bio : userData.bio,
+        profileColor:
+          profileData.profileColor || userData.profileColor || 'bg-[#5ccfee]',
+        bannerColor:
+          profileData.bannerColor ||
+          userData.bannerColor ||
+          'from-[#00BFFF] to-[#5ccfee]',
+        // Store raw color values to ensure consistent display
+        rawProfileColor:
+          profileData.rawProfileColor || userData.rawProfileColor || '#5ccfee',
+        rawBannerColor:
+          profileData.rawBannerColor || userData.rawBannerColor || '#00BFFF',
         updatedAt: new Date().toISOString(),
       }
 
