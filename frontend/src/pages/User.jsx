@@ -163,6 +163,9 @@ function User() {
   // Add state for profile form errors
   const [profileError, setProfileError] = useState('')
 
+  // State for managing selected tab
+  const [selectedTab, setSelectedTab] = useState('watchlist')
+
   // Calculate user statistics
   useEffect(() => {
     if (userProfile) {
@@ -1268,6 +1271,44 @@ function User() {
     }
   }
 
+  // Function to render the selected movie collection
+  const renderMovieCollection = () => {
+    switch (selectedTab) {
+      case 'watchlist':
+        return (
+          <MovieCollection
+            title="My Watchlist"
+            movies={watchlistMovies}
+            actions={collectionActions.watchlist}
+            isLoading={loading.watchlist}
+            description="Movies and shows you want to watch later"
+          />
+        )
+      case 'liked':
+        return (
+          <MovieCollection
+            title="My Favorites"
+            movies={favoritesMovies}
+            actions={collectionActions.liked}
+            isLoading={loading.liked}
+            description="Movies and shows you've marked as favorites"
+          />
+        )
+      case 'watched':
+        return (
+          <MovieCollection
+            title="Watched Movies"
+            movies={watchedMovies}
+            actions={collectionActions.watched}
+            isLoading={loading.watched}
+            description="Movies and shows you've already watched"
+          />
+        )
+      default:
+        return null
+    }
+  }
+
   if (!currentUser) {
     navigate('/login')
     return null
@@ -1908,43 +1949,43 @@ function User() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Watchlist Collection */}
-                <div className="bg-[#1e1e1e] rounded-lg shadow-md overflow-hidden border border-[#2a2a2a]">
-                  <div className="p-4">
-                    <MovieCollection
-                      title="My Watchlist"
-                      movies={watchlistMovies}
-                      actions={collectionActions.watchlist}
-                      isLoading={loading.watchlist}
-                      description="Movies and shows you want to watch later"
-                    />
-                  </div>
+                {/* Tab Selector for Movie Collections */}
+                <div className="flex space-x-4 mb-6">
+                  <button
+                    className={`flex-1 py-2 text-center font-medium ${
+                      selectedTab === 'watchlist'
+                        ? 'text-[#5ccfee] border-b-2 border-[#5ccfee]'
+                        : 'text-gray-300 hover:text-[#5ccfee]'
+                    }`}
+                    onClick={() => setSelectedTab('watchlist')}
+                  >
+                    Watchlist
+                  </button>
+                  <button
+                    className={`flex-1 py-2 text-center font-medium ${
+                      selectedTab === 'liked'
+                        ? 'text-[#5ccfee] border-b-2 border-[#5ccfee]'
+                        : 'text-gray-300 hover:text-[#5ccfee]'
+                    }`}
+                    onClick={() => setSelectedTab('liked')}
+                  >
+                    Liked
+                  </button>
+                  <button
+                    className={`flex-1 py-2 text-center font-medium ${
+                      selectedTab === 'watched'
+                        ? 'text-[#5ccfee] border-b-2 border-[#5ccfee]'
+                        : 'text-gray-300 hover:text-[#5ccfee]'
+                    }`}
+                    onClick={() => setSelectedTab('watched')}
+                  >
+                    Watched
+                  </button>
                 </div>
 
-                {/* Favorites Collection */}
+                {/* Render the selected movie collection */}
                 <div className="bg-[#1e1e1e] rounded-lg shadow-md overflow-hidden border border-[#2a2a2a]">
-                  <div className="p-4">
-                    <MovieCollection
-                      title="My Favorites"
-                      movies={favoritesMovies}
-                      actions={collectionActions.liked}
-                      isLoading={loading.liked}
-                      description="Movies and shows you've marked as favorites"
-                    />
-                  </div>
-                </div>
-
-                {/* Watched Collection */}
-                <div className="bg-[#1e1e1e] rounded-lg shadow-md overflow-hidden border border-[#2a2a2a]">
-                  <div className="p-4">
-                    <MovieCollection
-                      title="Watched Movies"
-                      movies={watchedMovies}
-                      actions={collectionActions.watched}
-                      isLoading={loading.watched}
-                      description="Movies and shows you've already watched"
-                    />
-                  </div>
+                  <div className="p-4">{renderMovieCollection()}</div>
                 </div>
               </div>
             )}
