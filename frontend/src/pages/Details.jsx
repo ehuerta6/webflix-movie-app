@@ -514,18 +514,7 @@ function Details() {
                     <span>▶</span> Watch Trailer
                   </a>
                 )}
-                <MediaActions media={details} />
-
-                {/* Adding a note about permissions issue with Test Watchlist button */}
-                <div className="bg-yellow-500/10 text-yellow-300 text-xs px-3 py-2 rounded-md">
-                  <p>
-                    Please use the Watchlist button above instead of the test
-                    button.
-                  </p>
-                  <p>
-                    The MediaActions component handles permissions correctly.
-                  </p>
-                </div>
+                <MediaActions />
               </div>
 
               {/* Additional Info Grid */}

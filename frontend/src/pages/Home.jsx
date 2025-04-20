@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import MovieCard from '../components/MovieCard'
 import { fetchTrending, fetchMovies, fetchShows } from '../services/api'
-import { useAuth } from '../context/AuthContext'
+import FeaturedMovie from '../components/FeaturedMovie'
 
 // Utility function to preload images for smoother UI
 const preloadImages = (imageUrls) => {
@@ -48,17 +48,6 @@ function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const carouselTimerRef = useRef(null)
-  const {
-    currentUser,
-    addToWatchlist,
-    addToWatched,
-    userProfile,
-    removeFromWatchlist,
-    removeFromWatched,
-    addToFavorites,
-    removeFromFavorites,
-    fetchUserProfile,
-  } = useAuth()
 
   // Format movie data to be consistent with MovieCard component
   const formatMovieData = (movie) => ({
@@ -151,153 +140,6 @@ function Home() {
       carouselTimerRef.current = setInterval(rotateFeatured, 8000)
     }
     setCurrentFeaturedIndex(index)
-  }
-
-  // Handle adding to watchlist
-  const handleAddToWatchlist = async (media) => {
-    try {
-      if (!currentUser) {
-        console.log('User not logged in')
-        return
-      }
-
-      // Check if movie is already in watchlist
-      const isInWatchlist = userProfile?.watchlist?.some(
-        (item) => item.id === media.id && item.type === media.type
-      )
-
-      if (isInWatchlist) {
-        // Remove from watchlist
-        console.log('Removing from watchlist:', media)
-        await removeFromWatchlist(media.id, media.type)
-        console.log('Successfully removed from watchlist!')
-      } else {
-        // Add to watchlist
-        console.log('Adding to watchlist:', media)
-
-        // Format the media data for the addToWatchlist function
-        const formattedMedia = {
-          id: media.id,
-          title: media.title,
-          poster_path: media.poster,
-          media_type: media.type,
-          vote_average: parseFloat(media.rating),
-          release_date: `${media.year}-01-01`,
-          overview: media.description,
-        }
-
-        // Call the Firestore function with the right parameters
-        await addToWatchlist(
-          currentUser.uid,
-          media.id,
-          JSON.stringify(formattedMedia)
-        )
-        console.log('Successfully added to watchlist!')
-      }
-
-      // Refresh user profile to update UI
-      await fetchUserProfile()
-    } catch (error) {
-      console.error('Error handling watchlist:', error)
-    }
-  }
-
-  // Handle adding to favorites
-  const handleAddToFavorites = async (media) => {
-    try {
-      if (!currentUser) {
-        console.log('User not logged in')
-        return
-      }
-
-      // Check if movie is already in favorites
-      const isInFavorites = userProfile?.favorites?.some(
-        (item) => item.id === media.id && item.type === media.type
-      )
-
-      if (isInFavorites) {
-        // Remove from favorites
-        console.log('Removing from favorites:', media)
-        await removeFromFavorites(media.id, media.type)
-        console.log('Successfully removed from favorites!')
-      } else {
-        // Add to favorites
-        console.log('Adding to favorites:', media)
-
-        // Format the media data for the addToFavorites function
-        const formattedMedia = {
-          id: media.id,
-          title: media.title,
-          poster_path: media.poster,
-          media_type: media.type,
-          vote_average: parseFloat(media.rating),
-          release_date: `${media.year}-01-01`,
-          overview: media.description,
-        }
-
-        // Call the Firestore function with the right parameters
-        await addToFavorites(
-          currentUser.uid,
-          media.id,
-          JSON.stringify(formattedMedia)
-        )
-        console.log('Successfully added to favorites!')
-      }
-
-      // Refresh user profile to update UI
-      await fetchUserProfile()
-    } catch (error) {
-      console.error('Error handling favorites:', error)
-    }
-  }
-
-  // Handle marking as watched
-  const handleMarkAsWatched = async (media) => {
-    try {
-      if (!currentUser) {
-        console.log('User not logged in')
-        return
-      }
-
-      // Check if movie is already in watched
-      const isWatched = userProfile?.watched?.some(
-        (item) => item.id === media.id && item.type === media.type
-      )
-
-      if (isWatched) {
-        // Remove from watched
-        console.log('Removing from watched:', media)
-        await removeFromWatched(media.id, media.type)
-        console.log('Successfully removed from watched!')
-      } else {
-        // Add to watched
-        console.log('Marking as watched:', media)
-
-        // Format the media data for the addToWatched function
-        const formattedMedia = {
-          id: media.id,
-          title: media.title,
-          poster_path: media.poster,
-          media_type: media.type,
-          vote_average: parseFloat(media.rating),
-          release_date: `${media.year}-01-01`,
-          overview: media.description,
-        }
-
-        // Call the Firestore function with the right parameters
-        await addToWatched(
-          currentUser.uid,
-          media.id,
-          JSON.stringify(formattedMedia)
-        )
-        console.log('Successfully marked as watched!')
-      }
-
-      // Refresh user profile to update UI
-      await fetchUserProfile()
-    } catch (error) {
-      console.error('Error handling watched status:', error)
-    }
   }
 
   // Fetch data from API
@@ -393,319 +235,32 @@ function Home() {
     }
   }, [currentFeaturedIndex, featuredItems])
 
-  // Define CSS animation style for the carousel
-  const carouselAnimation = {
-    opacity: 1,
-    transition: 'opacity 600ms ease-in-out, transform 800ms ease-in-out',
+  // Function to go to the next item
+  const goToNext = (e) => {
+    e.preventDefault()
+    setCurrentFeaturedIndex((prevIndex) =>
+      prevIndex === featuredItems.length - 1 ? 0 : prevIndex + 1
+    )
+
+    // Reset timer
+    if (carouselTimerRef.current) {
+      clearInterval(carouselTimerRef.current)
+      carouselTimerRef.current = setInterval(rotateFeatured, 8000)
+    }
   }
 
-  // Featured component for the main highlight with carousel
-  const Featured = ({ movie }) => {
-    const [backdropLoaded, setBackdropLoaded] = useState(false)
-
-    // Return early if movie is invalid, but after useState calls
-    if (!movie || !movie.backdrop) return null
-
-    // Function to go to the next item
-    const goToNext = (e) => {
-      e.preventDefault()
-      setCurrentFeaturedIndex((prevIndex) =>
-        prevIndex === featuredItems.length - 1 ? 0 : prevIndex + 1
-      )
-
-      // Reset timer
-      if (carouselTimerRef.current) {
-        clearInterval(carouselTimerRef.current)
-        carouselTimerRef.current = setInterval(rotateFeatured, 8000)
-      }
-    }
-
-    // Function to go to the previous item
-    const goToPrev = (e) => {
-      e.preventDefault()
-      setCurrentFeaturedIndex((prevIndex) =>
-        prevIndex === 0 ? featuredItems.length - 1 : prevIndex - 1
-      )
-
-      // Reset timer
-      if (carouselTimerRef.current) {
-        clearInterval(carouselTimerRef.current)
-        carouselTimerRef.current = setInterval(rotateFeatured, 8000)
-      }
-    }
-
-    return (
-      <section className="relative mb-10">
-        <div className="w-full h-[400px] md:h-[550px] lg:h-[600px] relative overflow-hidden">
-          {/* Gradient overlay for better text visibility */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#121212]/80 via-transparent to-[#121212]/80 z-10"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#12121280] to-transparent z-10"></div>
-
-          {/* Loading state */}
-          {!backdropLoaded && (
-            <div className="absolute inset-0 bg-[#1a1a1a] flex items-center justify-center z-5">
-              <div className="w-10 h-10 border-3 border-[#5ccfee] border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
-
-          {/* Background image with animation */}
-          <div
-            className="w-full h-full"
-            style={{
-              ...carouselAnimation,
-              position: 'relative',
-            }}
-          >
-            <img
-              key={movie.id} // Key helps React identify when to animate
-              src={movie.backdrop}
-              alt={movie.title}
-              className={`w-full h-full object-cover transition-all duration-700 ease-out ${
-                backdropLoaded ? 'opacity-100' : 'opacity-0'
-              }`}
-              style={{
-                transform: 'scale(1.05)',
-                animation: backdropLoaded
-                  ? 'fadeIn 800ms ease-in-out forwards'
-                  : 'none',
-              }}
-              onLoad={() => setBackdropLoaded(true)}
-              fetchPriority="high"
-            />
-          </div>
-
-          {/* Content overlay with animation */}
-          <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-8 z-20">
-            <div className="max-w-4xl mx-auto w-full" style={carouselAnimation}>
-              <div className="flex items-center gap-2 mb-1 opacity-90">
-                <span className="rating-badge">{movie.rating}</span>
-                <span className="text-gray-300 text-sm">{movie.year}</span>
-                <span className="text-gray-300 text-sm hidden sm:inline">
-                  • {movie.genres && movie.genres.join(', ')}
-                </span>
-              </div>
-
-              <h1
-                className="text-2xl md:text-3xl lg:text-4xl font-medium text-white mb-2"
-                key={`title-${movie.id}`}
-                style={{
-                  animation: 'slideUp 600ms ease-out forwards',
-                  textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                }}
-              >
-                {movie.title}
-              </h1>
-
-              <p
-                className="text-gray-300 text-sm md:text-base leading-relaxed max-w-2xl mb-4 line-clamp-3 md:line-clamp-none"
-                key={`desc-${movie.id}`}
-                style={{
-                  animation: 'slideUp 700ms ease-out forwards',
-                  animationDelay: '100ms',
-                  opacity: 0,
-                }}
-              >
-                {movie.description}
-              </p>
-
-              {/* Actions */}
-              <div
-                className="flex items-center flex-wrap gap-3 mt-5 w-full"
-                style={{
-                  animation: 'slideUp 800ms ease-out forwards',
-                  animationDelay: '200ms',
-                  opacity: 0,
-                }}
-              >
-                <Link
-                  to={`/${movie.type}/${movie.id}`}
-                  className="primary-button flex items-center gap-1 group cursor-pointer"
-                >
-                  <span className="transform transition-transform group-hover:scale-110">
-                    ▶
-                  </span>{' '}
-                  Watch Now
-                </Link>
-
-                {currentUser && (
-                  <>
-                    <button
-                      onClick={() => handleAddToWatchlist(movie)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer ${
-                        userProfile?.watchlist?.some(
-                          (item) =>
-                            item.id === movie.id && item.type === movie.type
-                        )
-                          ? 'bg-[#5ccfee] text-black'
-                          : 'bg-gray-800 text-white hover:bg-gray-700'
-                      }`}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 4v16m8-8H4"
-                        />
-                      </svg>
-                      {userProfile?.watchlist?.some(
-                        (item) =>
-                          item.id === movie.id && item.type === movie.type
-                      )
-                        ? 'In Watchlist'
-                        : 'Add to Watchlist'}
-                    </button>
-
-                    <button
-                      onClick={() => handleMarkAsWatched(movie)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer ${
-                        userProfile?.watched?.some(
-                          (item) =>
-                            item.id === movie.id && item.type === movie.type
-                        )
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-800 text-white hover:bg-gray-700'
-                      }`}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      {userProfile?.watched?.some(
-                        (item) =>
-                          item.id === movie.id && item.type === movie.type
-                      )
-                        ? 'Watched'
-                        : 'Mark as Watched'}
-                    </button>
-
-                    <button
-                      onClick={() => handleAddToFavorites(movie)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer ${
-                        userProfile?.favorites?.some(
-                          (item) =>
-                            item.id === movie.id && item.type === movie.type
-                        )
-                          ? 'bg-red-600 text-white'
-                          : 'bg-gray-800 text-white hover:bg-gray-700'
-                      }`}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                        />
-                      </svg>
-                      {userProfile?.favorites?.some(
-                        (item) =>
-                          item.id === movie.id && item.type === movie.type
-                      )
-                        ? 'Favorited'
-                        : 'Add to Favorites'}
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* Carousel indicators */}
-              {featuredItems.length > 1 && (
-                <div
-                  className="flex mt-6 gap-2"
-                  style={{
-                    animation: 'fadeIn 1s ease-out forwards',
-                    animationDelay: '300ms',
-                    opacity: 0,
-                  }}
-                >
-                  {featuredItems.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => changeFeaturedItem(index)}
-                      className={`w-2.5 h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
-                        index === currentFeaturedIndex
-                          ? 'bg-[#5ccfee] w-5'
-                          : 'bg-gray-600 hover:bg-gray-500'
-                      }`}
-                      aria-label={`View featured item ${index + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Navigation arrows */}
-          {featuredItems.length > 1 && (
-            <>
-              <button
-                onClick={goToPrev}
-                className="absolute left-2 md:left-6 top-1/2 transform -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full focus:outline-none transition-all duration-200 hover:scale-110 cursor-pointer"
-                aria-label="Previous featured item"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-              <button
-                onClick={goToNext}
-                className="absolute right-2 md:right-6 top-1/2 transform -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full focus:outline-none transition-all duration-200 hover:scale-110 cursor-pointer"
-                aria-label="Next featured item"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            </>
-          )}
-        </div>
-      </section>
+  // Function to go to the previous item
+  const goToPrev = (e) => {
+    e.preventDefault()
+    setCurrentFeaturedIndex((prevIndex) =>
+      prevIndex === 0 ? featuredItems.length - 1 : prevIndex - 1
     )
+
+    // Reset timer
+    if (carouselTimerRef.current) {
+      clearInterval(carouselTimerRef.current)
+      carouselTimerRef.current = setInterval(rotateFeatured, 8000)
+    }
   }
 
   // Section component for code reuse
@@ -756,7 +311,16 @@ function Home() {
   return (
     <div className="bg-[#121212] min-h-screen pb-8">
       <div className="w-full mx-auto">
-        {featured && <Featured movie={featured} />}
+        {featured && (
+          <FeaturedMovie
+            movie={featured}
+            featuredItems={featuredItems}
+            currentFeaturedIndex={currentFeaturedIndex}
+            changeFeaturedItem={changeFeaturedItem}
+            goToNext={goToNext}
+            goToPrev={goToPrev}
+          />
+        )}
 
         <div className="max-w-screen-2xl mx-auto">
           {popular.length > 0 && (

@@ -10,8 +10,7 @@ import {
 } from '../services/api'
 import Pagination from '../components/Pagination'
 import MovieCard from '../components/MovieCard'
-import { useAuth } from '../context/AuthContext'
-import { toast } from 'react-hot-toast'
+import FeaturedMovie from '../components/FeaturedMovie'
 
 function SearchPage() {
   const location = useLocation()
@@ -19,27 +18,15 @@ function SearchPage() {
   const queryParams = new URLSearchParams(location.search)
   const searchQuery = queryParams.get('q') || ''
   const [searchInput, setSearchInput] = useState(searchQuery)
-  const {
-    currentUser,
-    addToWatchlist,
-    addToWatched,
-    userProfile,
-    removeFromWatchlist,
-    removeFromWatched,
-    addToFavorites,
-    removeFromFavorites,
-    fetchUserProfile,
-  } = useAuth()
 
   const [searchResults, setSearchResults] = useState([])
   const [popularMovies, setPopularMovies] = useState([])
+  const [trendingContent, setTrendingContent] = useState([])
   const [activeTab, setActiveTab] = useState('all')
   const [loading, setLoading] = useState(false)
-  const [loadingPopular, setLoadingPopular] = useState(false)
   const [error, setError] = useState(null)
   const [genreMap, setGenreMap] = useState({})
   const [genreList, setGenreList] = useState([])
-  const [isGenreSearch, setIsGenreSearch] = useState(false)
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -110,6 +97,11 @@ function SearchPage() {
         ? (movie.release_date || movie.first_air_date).substring(0, 4)
         : 'Unknown',
     description: movie.overview,
+    genres: movie.genre_ids
+      ? movie.genre_ids
+          .map((id) => genreMap[id] || 'Unknown')
+          .filter((name) => name !== 'Unknown')
+      : [],
   })
 
   // Load genres for proper display and search
@@ -154,6 +146,7 @@ function SearchPage() {
     if (!searchQuery) {
       loadPopularMovies()
       loadFeaturedContent()
+      loadTrendingContent()
     } else {
       performSearch()
     }
@@ -170,9 +163,12 @@ function SearchPage() {
 
       // Set new timer
       carouselTimerRef.current = setInterval(() => {
-        setCurrentFeaturedIndex((prevIndex) =>
-          prevIndex === featuredItems.length - 1 ? 0 : prevIndex + 1
-        )
+        setCurrentFeaturedIndex((prevIndex) => {
+          const nextIndex =
+            prevIndex === featuredItems.length - 1 ? 0 : prevIndex + 1
+          setFeatured(featuredItems[nextIndex])
+          return nextIndex
+        })
       }, 8000)
     }
 
@@ -184,8 +180,24 @@ function SearchPage() {
     }
   }, [featuredItems])
 
+  const loadTrendingContent = async () => {
+    try {
+      const data = await fetchTrending('all', 'day')
+
+      if (data.results && data.results.length > 0) {
+        const validResults = data.results
+          .filter(isValidContent)
+          .map(formatMovieData)
+
+        setTrendingContent(validResults)
+      }
+    } catch (error) {
+      console.error('Error loading trending content:', error)
+    }
+  }
+
   const loadPopularMovies = async () => {
-    setLoadingPopular(true)
+    setLoading(true)
     try {
       let results
 
@@ -206,595 +218,209 @@ function SearchPage() {
         setTotalPages(data.total_pages)
         setTotalResults(data.total_results)
       } else {
-        const data = await fetchTrending('all', 'week')
+        // All content (trending)
+        const data = await fetchTrending('all', 'week', currentPage)
         results = data.results
-        setTotalPages(data.total_pages || 1)
-        setTotalResults(data.total_results || results.length)
+        setTotalPages(data.total_pages)
+        setTotalResults(data.total_results)
       }
 
-      // Filter out invalid content
-      const validResults = results.filter(isValidContent)
-      const formattedResults = validResults.map(formatMovieData)
+      // Filter valid content and format
+      const validResults = results
+        .filter(isValidContent)
+        .map((item) => formatMovieData(item))
 
-      setPopularMovies(formattedResults)
-      setError(null)
-    } catch (err) {
-      console.error('Error loading popular content:', err)
-      setError('Failed to load content. Please try again later.')
-      setPopularMovies([])
+      setPopularMovies(validResults)
+    } catch (error) {
+      console.error('Error loading popular content:', error)
+      setError('Failed to load content. Please try again.')
     } finally {
-      setLoadingPopular(false)
+      setLoading(false)
     }
   }
 
   const loadFeaturedContent = async () => {
     try {
-      const data = await fetchTrending('all', 'day')
+      const trendingData = await fetchTrending('all', 'day')
 
-      if (data && data.results && data.results.length > 0) {
-        // Filter for valid featured items
-        const validFeatured = data.results
-          .filter((item) => isValidContent(item) && item.backdrop_path)
-          .slice(0, 5) // Take top 5 trending items
+      if (trendingData.results && trendingData.results.length > 0) {
+        // Filter for items with backdrop images
+        const validResults = trendingData.results.filter(
+          (item) => isValidContent(item) && item.backdrop_path
+        )
 
-        if (validFeatured.length > 0) {
-          const formattedFeatured = validFeatured.map(formatMovieData)
-          setFeaturedItems(formattedFeatured)
-          setFeatured(formattedFeatured[0])
+        if (validResults.length > 0) {
+          // Get top 5 trending items for featured content
+          const featured = validResults.slice(0, 5).map(formatMovieData)
+          setFeaturedItems(featured)
+          setFeatured(featured[0])
         }
       }
-    } catch (err) {
-      console.error('Error loading featured content:', err)
+    } catch (error) {
+      console.error('Error loading featured content:', error)
+      // Don't show error for featured content, just skip showing it
     }
   }
 
   const performSearch = async () => {
-    if (!searchQuery || searchQuery.trim() === '') return
-
     setLoading(true)
     setError(null)
 
     try {
-      let results = []
-      let totalPgs = 0
-      let totalRes = 0
+      let results
+      const page = currentPage || 1
 
-      // Determine the type of search based on active tab
-      if (isGenreSearch) {
-        // Genre search
-        const genreId = searchQuery.split('-')[1]
-        if (genreId) {
-          const mediaType = activeTab === 'tv' ? 'tv' : 'movie'
-          const data = await searchByGenre(genreId, mediaType, currentPage)
-
-          results = data.results.map((item) => ({
-            ...item,
-            media_type: mediaType,
-          }))
-
-          totalPgs = data.total_pages
-          totalRes = data.total_results
-        }
+      // Check if this is a genre search
+      const genreMatch = searchQuery.match(/^genre-(\d+)$/)
+      if (genreMatch) {
+        const genreId = genreMatch[1]
+        // Search by genre ID
+        const mediaType = activeTab === 'all' ? null : activeTab
+        const data = await searchByGenre(genreId, mediaType, page)
+        results = data.results
+        setTotalPages(data.total_pages)
+        setTotalResults(data.total_results)
       } else {
-        // Text search
-        const data = await searchTMDB(searchQuery, currentPage)
+        // Normal text search
+        const params = {
+          query: searchQuery,
+          page,
+        }
 
-        results = data.results.filter((item) => {
-          if (activeTab === 'all') return true
-          return item.media_type === activeTab
-        })
+        // If a specific tab is selected, filter by media type
+        if (activeTab !== 'all') {
+          params.media_type = activeTab
+        }
 
-        totalPgs = data.total_pages
-        totalRes = data.total_results
+        const data = await searchTMDB(params)
+        results = data.results
+        setTotalPages(data.total_pages)
+        setTotalResults(data.total_results)
       }
 
-      // Filter out invalid content
-      const validResults = results.filter(isValidContent)
-      const formattedResults = validResults.map(formatMovieData)
+      // Filter valid content and format for display
+      const validResults = results
+        .filter(isValidContent)
+        .map((item) => formatMovieData(item))
 
-      setSearchResults(formattedResults)
-      setTotalPages(totalPgs)
-      setTotalResults(totalRes)
-      setError(null)
-    } catch (err) {
-      console.error('Error searching:', err)
-      setError('Failed to perform search. Please try again later.')
+      setSearchResults(validResults)
+    } catch (error) {
+      console.error('Search error:', error)
+      setError('An error occurred while searching. Please try again.')
       setSearchResults([])
     } finally {
       setLoading(false)
     }
   }
 
-  // Function to handle search submission
   const handleSearchSubmit = (e) => {
     e.preventDefault()
     if (searchInput.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchInput.trim())}`)
-      setCurrentPage(1)
     }
+    setCurrentPage(1)
   }
 
-  // Function to handle page changes
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage)
-    window.scrollTo(0, 0)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // Display either search results or popular content
-  const displayedContent = searchQuery ? searchResults : popularMovies
-
-  // Handle adding to watchlist
-  const handleAddToWatchlist = async (movie) => {
-    if (!currentUser) {
-      toast.error('Please log in to add to watchlist')
-      return
-    }
-
-    // Check if movie is already in watchlist
-    const isInWatchlist = userProfile?.watchlist?.some(
-      (item) => item.id === movie.id
+  // Function to go to the next item
+  const goToNext = (e) => {
+    e.preventDefault()
+    setCurrentFeaturedIndex((prevIndex) =>
+      prevIndex === featuredItems.length - 1 ? 0 : prevIndex + 1
     )
 
-    try {
-      if (isInWatchlist) {
-        await removeFromWatchlist(movie.id, movie.type)
-        toast.success(`Removed ${movie.title || movie.name} from watchlist`)
-      } else {
-        // Format media data for addToWatchlist
-        const formattedMedia = {
-          id: movie.id,
-          title: movie.title || movie.name,
-          poster_path: movie.poster,
-          media_type: movie.type,
-          vote_average: movie.rating ? parseFloat(movie.rating) : 0,
-          release_date: movie.year ? `${movie.year}-01-01` : null,
-          overview: movie.description || '',
-        }
-
-        await addToWatchlist(
-          currentUser.uid,
-          movie.id,
-          JSON.stringify(formattedMedia)
-        )
-        toast.success(`Added ${movie.title || movie.name} to watchlist`)
-      }
-      // Refresh user profile to update UI
-      await fetchUserProfile()
-    } catch (error) {
-      console.error('Error updating watchlist:', error)
-      toast.error('An error occurred. Please try again.')
+    // Reset timer
+    if (carouselTimerRef.current) {
+      clearInterval(carouselTimerRef.current)
+      carouselTimerRef.current = setInterval(() => {
+        setCurrentFeaturedIndex((prev) => {
+          const nextIndex = (prev + 1) % featuredItems.length
+          setFeatured(featuredItems[nextIndex])
+          return nextIndex
+        })
+      }, 8000)
     }
   }
 
-  // Handle adding to favorites
-  const handleAddToFavorites = async (movie) => {
-    if (!currentUser) {
-      toast.error('Please log in to add to favorites')
-      return
-    }
-
-    // Check if movie is already in favorites
-    const isFavorite = userProfile?.favorites?.some(
-      (item) => item.id === movie.id
+  // Function to go to the previous item
+  const goToPrev = (e) => {
+    e.preventDefault()
+    setCurrentFeaturedIndex((prevIndex) =>
+      prevIndex === 0 ? featuredItems.length - 1 : prevIndex - 1
     )
 
-    try {
-      if (isFavorite) {
-        await removeFromFavorites(movie.id, movie.type)
-        toast.success(`Removed ${movie.title || movie.name} from favorites`)
-      } else {
-        // Format media data for addToFavorites
-        const formattedMedia = {
-          id: movie.id,
-          title: movie.title || movie.name,
-          poster_path: movie.poster,
-          media_type: movie.type,
-          vote_average: movie.rating ? parseFloat(movie.rating) : 0,
-          release_date: movie.year ? `${movie.year}-01-01` : null,
-          overview: movie.description || '',
-        }
-
-        await addToFavorites(
-          currentUser.uid,
-          movie.id,
-          JSON.stringify(formattedMedia)
-        )
-        toast.success(`Added ${movie.title || movie.name} to favorites`)
-      }
-      // Refresh user profile to update UI
-      await fetchUserProfile()
-    } catch (error) {
-      console.error('Error updating favorites:', error)
-      toast.error('An error occurred. Please try again.')
+    // Reset timer
+    if (carouselTimerRef.current) {
+      clearInterval(carouselTimerRef.current)
+      carouselTimerRef.current = setInterval(() => {
+        setCurrentFeaturedIndex((prev) => {
+          const nextIndex = (prev + 1) % featuredItems.length
+          setFeatured(featuredItems[nextIndex])
+          return nextIndex
+        })
+      }, 8000)
     }
   }
 
-  // Handle marking as watched
-  const handleMarkAsWatched = async (movie) => {
-    if (!currentUser) {
-      toast.error('Please log in to mark as watched')
-      return
+  // Function to manually change featured item
+  const changeFeaturedItem = (index) => {
+    // Reset the timer when manually changed
+    if (carouselTimerRef.current) {
+      clearInterval(carouselTimerRef.current)
+      carouselTimerRef.current = setInterval(() => {
+        setCurrentFeaturedIndex((prev) => {
+          const nextIndex = (prev + 1) % featuredItems.length
+          setFeatured(featuredItems[nextIndex])
+          return nextIndex
+        })
+      }, 8000)
     }
-
-    // Check if movie is already in watched
-    const isWatched = userProfile?.watched?.some((item) => item.id === movie.id)
-
-    try {
-      if (isWatched) {
-        await removeFromWatched(movie.id, movie.type)
-        toast.success(`Removed ${movie.title || movie.name} from watched`)
-      } else {
-        // Format media data for addToWatched
-        const formattedMedia = {
-          id: movie.id,
-          title: movie.title || movie.name,
-          poster_path: movie.poster,
-          media_type: movie.type,
-          vote_average: movie.rating ? parseFloat(movie.rating) : 0,
-          release_date: movie.year ? `${movie.year}-01-01` : null,
-          overview: movie.description || '',
-        }
-
-        await addToWatched(
-          currentUser.uid,
-          movie.id,
-          JSON.stringify(formattedMedia)
-        )
-        toast.success(`Marked ${movie.title || movie.name} as watched`)
-      }
-      // Refresh user profile to update UI
-      await fetchUserProfile()
-    } catch (error) {
-      console.error('Error updating watched status:', error)
-      toast.error('An error occurred. Please try again.')
-    }
-  }
-
-  // Featured component for the hero section
-  const Featured = ({ movie }) => {
-    const [backdropLoaded, setBackdropLoaded] = useState(false)
-
-    // Return early if movie is invalid, but after useState calls
-    if (!movie || !movie.backdrop) return null
-
-    // Function to go to the next item
-    const goToNext = (e) => {
-      e.preventDefault()
-      setCurrentFeaturedIndex((prevIndex) =>
-        prevIndex === featuredItems.length - 1 ? 0 : prevIndex + 1
-      )
-
-      // Reset timer
-      if (carouselTimerRef.current) {
-        clearInterval(carouselTimerRef.current)
-        carouselTimerRef.current = setInterval(() => {
-          setCurrentFeaturedIndex((prev) => {
-            const nextIndex = (prev + 1) % featuredItems.length
-            setFeatured(featuredItems[nextIndex])
-            return nextIndex
-          })
-        }, 8000)
-      }
-    }
-
-    // Function to go to the previous item
-    const goToPrev = (e) => {
-      e.preventDefault()
-      setCurrentFeaturedIndex((prevIndex) =>
-        prevIndex === 0 ? featuredItems.length - 1 : prevIndex - 1
-      )
-
-      // Reset timer
-      if (carouselTimerRef.current) {
-        clearInterval(carouselTimerRef.current)
-        carouselTimerRef.current = setInterval(() => {
-          setCurrentFeaturedIndex((prev) => {
-            const nextIndex = (prev + 1) % featuredItems.length
-            setFeatured(featuredItems[nextIndex])
-            return nextIndex
-          })
-        }, 8000)
-      }
-    }
-
-    return (
-      <section className="relative mb-10">
-        <div className="w-full h-[400px] md:h-[550px] lg:h-[600px] relative overflow-hidden">
-          {/* Gradient overlay for better text visibility */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#121212]/80 via-transparent to-[#121212]/80 z-10"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#12121280] to-transparent z-10"></div>
-
-          {/* Loading state */}
-          {!backdropLoaded && (
-            <div className="absolute inset-0 bg-[#1a1a1a] flex items-center justify-center z-5">
-              <div className="w-10 h-10 border-3 border-[#5ccfee] border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
-
-          {/* Background image with animation */}
-          <div
-            className="w-full h-full"
-            style={{
-              opacity: 1,
-              transition:
-                'opacity 600ms ease-in-out, transform 800ms ease-in-out',
-              position: 'relative',
-            }}
-          >
-            <img
-              key={movie.id} // Key helps React identify when to animate
-              src={movie.backdrop}
-              alt={movie.title}
-              className={`w-full h-full object-cover transition-all duration-700 ease-out ${
-                backdropLoaded ? 'opacity-100' : 'opacity-0'
-              }`}
-              style={{
-                transform: 'scale(1.05)',
-                animation: backdropLoaded
-                  ? 'fadeIn 800ms ease-in-out forwards'
-                  : 'none',
-              }}
-              onLoad={() => setBackdropLoaded(true)}
-              fetchPriority="high"
-            />
-          </div>
-
-          {/* Content overlay with animation */}
-          <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-8 z-20">
-            <div
-              className="max-w-4xl mx-auto w-full"
-              style={{
-                opacity: 1,
-                transition:
-                  'opacity 600ms ease-in-out, transform 800ms ease-in-out',
-              }}
-            >
-              <div className="flex items-center gap-2 mb-1 opacity-90">
-                <span className="bg-[#5ccfee] text-black font-bold px-2 py-1 rounded mr-3">
-                  {movie.rating}
-                </span>
-                <span className="text-gray-300 text-sm">{movie.year}</span>
-                {movie.genre && (
-                  <span className="ml-2 px-2 py-1 bg-[#2a2a2a] rounded text-sm">
-                    {movie.genre}
-                  </span>
-                )}
-              </div>
-
-              <h1
-                className="text-2xl md:text-3xl lg:text-4xl font-medium text-white mb-2"
-                key={`title-${movie.id}`}
-                style={{
-                  animation: 'slideUp 600ms ease-out forwards',
-                  textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                }}
-              >
-                {movie.title}
-              </h1>
-
-              <p
-                className="text-gray-300 text-sm md:text-base leading-relaxed max-w-2xl mb-4 line-clamp-3 md:line-clamp-none"
-                key={`desc-${movie.id}`}
-                style={{
-                  animation: 'slideUp 700ms ease-out forwards',
-                  animationDelay: '100ms',
-                  opacity: 0,
-                }}
-              >
-                {movie.description}
-              </p>
-
-              {/* Featured component buttons */}
-              {currentUser && (
-                <div className="featured-buttons mt-4 flex gap-3">
-                  <button
-                    onClick={() => handleAddToWatchlist(movie)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer ${
-                      userProfile?.watchlist?.some(
-                        (item) => item.id === movie.id
-                      )
-                        ? 'bg-[#5ccfee] text-black'
-                        : 'bg-gray-800 text-white hover:bg-gray-700'
-                    }`}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    {userProfile?.watchlist?.some(
-                      (item) => item.id === movie.id
-                    )
-                      ? 'In Watchlist'
-                      : 'Add to Watchlist'}
-                  </button>
-                  <button
-                    onClick={() => handleMarkAsWatched(movie)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full ${
-                      userProfile?.watched?.some((item) => item.id === movie.id)
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-800 text-white'
-                    }`}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    {userProfile?.watched?.some((item) => item.id === movie.id)
-                      ? 'Watched'
-                      : 'Mark as Watched'}
-                  </button>
-                  <button
-                    onClick={() => handleAddToFavorites(movie)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full ${
-                      userProfile?.favorites?.some(
-                        (item) => item.id === movie.id
-                      )
-                        ? 'bg-red-600 text-white'
-                        : 'bg-gray-800 text-white'
-                    }`}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d={
-                          userProfile?.favorites?.some(
-                            (item) => item.id === movie.id
-                          )
-                            ? 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z'
-                            : 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z'
-                        }
-                      />
-                    </svg>
-                    {userProfile?.favorites?.some(
-                      (item) => item.id === movie.id
-                    )
-                      ? 'Favorited'
-                      : 'Add to Favorites'}
-                  </button>
-                </div>
-              )}
-
-              {/* Carousel indicators */}
-              {featuredItems.length > 1 && (
-                <div
-                  className="flex mt-6 gap-2"
-                  style={{
-                    animation: 'fadeIn 1s ease-out forwards',
-                    animationDelay: '300ms',
-                    opacity: 0,
-                  }}
-                >
-                  {featuredItems.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        setCurrentFeaturedIndex(index)
-                        setFeatured(featuredItems[index])
-
-                        // Reset timer when manually selecting
-                        if (carouselTimerRef.current) {
-                          clearInterval(carouselTimerRef.current)
-                          carouselTimerRef.current = setInterval(() => {
-                            setCurrentFeaturedIndex((prev) => {
-                              const nextIndex =
-                                (prev + 1) % featuredItems.length
-                              setFeatured(featuredItems[nextIndex])
-                              return nextIndex
-                            })
-                          }, 8000)
-                        }
-                      }}
-                      className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                        index === currentFeaturedIndex
-                          ? 'bg-[#5ccfee] w-5'
-                          : 'bg-gray-600 hover:bg-gray-500'
-                      }`}
-                      aria-label={`View featured item ${index + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Navigation arrows */}
-          {featuredItems.length > 1 && (
-            <>
-              <button
-                onClick={goToPrev}
-                className="absolute left-2 md:left-6 top-1/2 transform -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full focus:outline-none transition-all duration-200 hover:scale-110"
-                aria-label="Previous featured item"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-              <button
-                onClick={goToNext}
-                className="absolute right-2 md:right-6 top-1/2 transform -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full focus:outline-none transition-all duration-200 hover:scale-110"
-                aria-label="Next featured item"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            </>
-          )}
-        </div>
-      </section>
-    )
+    setCurrentFeaturedIndex(index)
+    setFeatured(featuredItems[index])
   }
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white pb-10">
-      {/* New minimalistic search bar at the top */}
-      <div className="w-full px-4 py-6 bg-[#121212] border-b border-[#2a2a2a] mb-8">
-        <form
-          onSubmit={handleSearchSubmit}
-          className="max-w-2xl mx-auto flex flex-col gap-3"
-        >
-          <div className="relative flex items-center">
+    <div className="bg-[#121212] min-h-screen pb-10">
+      <div className="container mx-auto px-4 md:px-6 pt-6">
+        {/* Compact Search form */}
+        <form onSubmit={handleSearchSubmit} className="mb-8 max-w-lg mx-auto">
+          <div className="relative">
             <input
               type="text"
-              placeholder="Search..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full bg-[#252525] text-white px-4 py-2 text-base rounded-md focus:outline-none focus:ring-1 focus:ring-[#5ccfee] pr-10"
-              autoFocus
+              placeholder="Search movies, TV shows, actors..."
+              className="w-full bg-[#1a1a1a] text-white py-2.5 px-4 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#5ccfee] border border-gray-800 shadow-sm"
             />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput('')}
+                className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
             <button
               type="submit"
-              className="absolute right-3 text-[#5ccfee] hover:text-white"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white hover:text-[#5ccfee] transition-colors"
               aria-label="Search"
             >
               <svg
@@ -814,19 +440,27 @@ function SearchPage() {
             </button>
           </div>
 
-          {/* Genre selector */}
+          {/* Compact Genre selector */}
           {genreList.length > 0 && (
-            <div className="flex justify-center flex-wrap gap-2">
-              {genreList.slice(0, 12).map((genre) => (
+            <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+              {genreList.slice(0, 8).map((genre) => (
                 <button
                   key={genre.id}
                   type="button"
                   onClick={() => {
-                    navigate(`/search?q=genre-${genre.id}`)
-                    setIsGenreSearch(true)
-                    setCurrentPage(1)
+                    // Toggle if genre is currently selected
+                    const newSearchInput = searchInput.includes(
+                      `genre:${genre.name}`
+                    )
+                      ? searchInput.replace(`genre:${genre.name}`, '').trim()
+                      : `${searchInput.trim()} genre:${genre.name}`.trim()
+                    setSearchInput(newSearchInput)
                   }}
-                  className="px-3 py-1 text-xs bg-[#252525] hover:bg-[#303030] text-gray-300 rounded-full transition-colors"
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                    searchInput.includes(`genre:${genre.name}`)
+                      ? 'bg-[#5ccfee] text-black'
+                      : 'bg-[#252525] text-white hover:bg-[#333]'
+                  }`}
                 >
                   {genre.name}
                 </button>
@@ -834,123 +468,170 @@ function SearchPage() {
             </div>
           )}
         </form>
-      </div>
 
-      {/* Rest of the component */}
-      <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        {/* Featured banner if no search is active */}
-        {!searchQuery && featured && <Featured movie={featured} />}
+        {/* Featured content */}
+        {!searchQuery && featured && !loading && (
+          <FeaturedMovie
+            movie={featured}
+            featuredItems={featuredItems}
+            currentFeaturedIndex={currentFeaturedIndex}
+            changeFeaturedItem={changeFeaturedItem}
+            goToNext={goToNext}
+            goToPrev={goToPrev}
+          />
+        )}
 
-        {/* Content tabs */}
-        <div className="mb-6 border-b border-[#2a2a2a]">
-          <div className="flex space-x-4 overflow-x-auto pb-2">
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'all'
-                  ? 'text-[#5ccfee] border-b-2 border-[#5ccfee]'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-              onClick={() => {
-                setActiveTab('all')
-                setCurrentPage(1)
-              }}
-            >
-              All Content
-            </button>
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'movies'
-                  ? 'text-[#5ccfee] border-b-2 border-[#5ccfee]'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-              onClick={() => {
-                setActiveTab('movies')
-                setCurrentPage(1)
-              }}
-            >
-              Movies
-            </button>
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'tv'
-                  ? 'text-[#5ccfee] border-b-2 border-[#5ccfee]'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-              onClick={() => {
-                setActiveTab('tv')
-                setCurrentPage(1)
-              }}
-            >
-              TV Shows
-            </button>
+        {/* Loading indicator */}
+        {loading && (
+          <div className="flex justify-center items-center py-16">
+            <div className="w-8 h-8 border-3 border-[#5ccfee] border-t-transparent rounded-full animate-spin"></div>
           </div>
-        </div>
+        )}
 
-        {/* Main content area */}
-        <div>
-          {/* Title and count */}
-          {searchQuery ? (
-            <h2 className="text-2xl font-bold mb-4">
-              {searchResults.length > 0
-                ? `Results for "${searchQuery}" (${totalResults})`
-                : `No results found for "${searchQuery}"`}
-            </h2>
-          ) : (
-            <h2 className="text-2xl font-bold mb-4">
-              {activeTab === 'all'
-                ? 'Trending Content'
-                : activeTab === 'movies'
-                ? 'Popular Movies'
-                : 'Popular TV Shows'}
-            </h2>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="p-4 mb-4 bg-red-800/50 text-white rounded-md">
-              {error}
+        {/* Trending content when no search is active */}
+        {!searchQuery && !loading && trendingContent.length > 0 && (
+          <div className="mb-12">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl text-white font-medium pl-1">
+                Trending Now
+              </h2>
+              <div className="flex items-center space-x-6 pr-2">
+                <button
+                  onClick={() => {
+                    setActiveTab('all')
+                    setCurrentPage(1)
+                  }}
+                  className={`text-sm font-medium transition-colors border-b-2 pb-0.5 ${
+                    activeTab === 'all'
+                      ? 'text-[#5ccfee] border-[#5ccfee]'
+                      : 'text-gray-400 border-transparent hover:text-white'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab('movies')
+                    setCurrentPage(1)
+                  }}
+                  className={`text-sm font-medium transition-colors border-b-2 pb-0.5 ${
+                    activeTab === 'movies'
+                      ? 'text-[#5ccfee] border-[#5ccfee]'
+                      : 'text-gray-400 border-transparent hover:text-white'
+                  }`}
+                >
+                  Movies
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab('tv')
+                    setCurrentPage(1)
+                  }}
+                  className={`text-sm font-medium transition-colors border-b-2 pb-0.5 ${
+                    activeTab === 'tv'
+                      ? 'text-[#5ccfee] border-[#5ccfee]'
+                      : 'text-gray-400 border-transparent hover:text-white'
+                  }`}
+                >
+                  TV Shows
+                </button>
+              </div>
             </div>
-          )}
 
-          {/* Loading indicator */}
-          {(loading || loadingPopular) && (
-            <div className="flex justify-center py-12">
-              <div className="w-10 h-10 border-4 border-[#5ccfee] border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
-
-          {/* Content grid */}
-          {!loading && !loadingPopular && displayedContent.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-              {displayedContent.map((item) => (
-                <MovieCard key={`${item.type}-${item.id}`} movie={item} />
+              {trendingContent.slice(0, 10).map((movie) => (
+                <MovieCard
+                  key={`trending-${movie.id}-${movie.type}`}
+                  movie={movie}
+                />
               ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* No results message */}
-          {!loading &&
-            !loadingPopular &&
-            displayedContent.length === 0 &&
-            !error && (
-              <div className="text-center py-12 text-gray-400">
-                {searchQuery
-                  ? 'No results found. Try a different search term or filter.'
-                  : 'No content available. Try a different category.'}
+        {/* Content tabs */}
+        {!loading && searchResults.length > 0 && (
+          <div>
+            <h2 className="text-xl text-white font-medium mb-5 pl-1">
+              Search Results
+              {searchQuery && (
+                <span className="text-gray-400 ml-1">for "{searchQuery}"</span>
+              )}
+              {totalResults > 0 && (
+                <span className="text-sm text-gray-400 font-normal ml-2">
+                  ({totalResults} results)
+                </span>
+              )}
+            </h2>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+              {searchResults.map((movie) => (
+                <MovieCard key={`${movie.id}-${movie.type}`} movie={movie} />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-10 flex justify-center">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
               </div>
             )}
+          </div>
+        )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-8">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-              />
+        {/* No results */}
+        {!loading && searchQuery && searchResults.length === 0 && (
+          <div className="text-center py-16">
+            <p className="text-lg text-gray-400 mb-3">
+              No results found for "{searchQuery}"
+            </p>
+            <p className="text-gray-500 text-sm">
+              Try adjusting your search or filter to find what you're looking
+              for.
+            </p>
+          </div>
+        )}
+
+        {/* Popular content when no search is active */}
+        {!searchQuery && !loading && popularMovies.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-xl text-white font-medium mb-5 pl-1">
+              {activeTab === 'movies'
+                ? 'Popular Movies'
+                : activeTab === 'tv'
+                ? 'Popular TV Shows'
+                : 'Popular Content'}
+            </h2>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+              {popularMovies.map((movie) => (
+                <MovieCard key={`${movie.id}-${movie.type}`} movie={movie} />
+              ))}
             </div>
-          )}
-        </div>
+
+            {/* Pagination for popular content */}
+            {totalPages > 1 && (
+              <div className="mt-10 flex justify-center">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Error display */}
+        {error && (
+          <div className="mt-8 p-4 bg-red-900/20 border border-red-800/30 rounded-lg text-white">
+            <p>{error}</p>
+          </div>
+        )}
       </div>
     </div>
   )
