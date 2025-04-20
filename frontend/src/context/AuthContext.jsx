@@ -177,6 +177,8 @@ export function AuthProvider({ children }) {
     if (!currentUser) return null
 
     try {
+      console.log('Fetching user profile for:', currentUser.uid)
+
       // Get user document from Firestore
       const userDocRef = doc(db, 'users', currentUser.uid)
       const userDoc = await getDoc(userDocRef)
@@ -184,8 +186,9 @@ export function AuthProvider({ children }) {
       if (userDoc.exists()) {
         // Get the user data from the document
         const userData = userDoc.data()
+        console.log('Fetched user profile data:', userData)
 
-        // Get watchlist items
+        // Fetch collections data (watchlist, watched, favorites)
         let watchlistItems = []
         try {
           const watchlistRef = collection(
@@ -196,49 +199,73 @@ export function AuthProvider({ children }) {
           )
           const watchlistSnapshot = await getDocs(watchlistRef)
 
-          watchlistItems = watchlistSnapshot.docs.map((doc) => {
-            const data = JSON.parse(doc.data().data || '{}')
-            return {
-              id: doc.id,
-              type: data.media_type,
-              title: data.title,
-              poster: data.poster_path,
-              rating: data.vote_average,
-              year: data.release_date ? data.release_date.split('-')[0] : 'N/A',
-            }
-          })
+          watchlistItems = watchlistSnapshot.docs
+            .map((doc) => {
+              try {
+                const data = JSON.parse(doc.data().data || '{}')
+                return {
+                  id: doc.id,
+                  type: data.media_type || 'movie',
+                  title: data.title || data.name || 'Unknown',
+                  poster: data.poster_path,
+                  rating: data.vote_average,
+                  year: data.release_date
+                    ? data.release_date.split('-')[0]
+                    : 'N/A',
+                }
+              } catch (parseError) {
+                console.error('Error parsing watchlist item:', parseError)
+                return null
+              }
+            })
+            .filter((item) => item !== null) // Remove any items that failed to parse
 
           console.log('Fetched watchlist items:', watchlistItems.length)
         } catch (error) {
           console.error('Error fetching watchlist:', error)
         }
 
+        // Build the complete profile
+        const profileData = {
+          ...userData,
+          watchlist: watchlistItems,
+          favorites: [], // Will be populated below
+          watched: [], // Will be populated below
+        }
+
         // Get watched movies
-        let watchedItems = []
         try {
           const watchedRef = collection(db, 'users', currentUser.uid, 'watched')
           const watchedSnapshot = await getDocs(watchedRef)
 
-          watchedItems = watchedSnapshot.docs.map((doc) => {
-            const data = JSON.parse(doc.data().data || '{}')
-            return {
-              id: doc.id,
-              type: data.media_type,
-              title: data.title,
-              poster: data.poster_path,
-              rating: data.vote_average,
-              year: data.release_date ? data.release_date.split('-')[0] : 'N/A',
-              watchedAt: doc.data().watchedAt,
-            }
-          })
+          profileData.watched = watchedSnapshot.docs
+            .map((doc) => {
+              try {
+                const data = JSON.parse(doc.data().data || '{}')
+                return {
+                  id: doc.id,
+                  type: data.media_type || 'movie',
+                  title: data.title || data.name || 'Unknown',
+                  poster: data.poster_path,
+                  rating: data.vote_average,
+                  year: data.release_date
+                    ? data.release_date.split('-')[0]
+                    : 'N/A',
+                  watchedAt: doc.data().watchedAt,
+                }
+              } catch (parseError) {
+                console.error('Error parsing watched item:', parseError)
+                return null
+              }
+            })
+            .filter((item) => item !== null) // Remove any items that failed to parse
 
-          console.log('Fetched watched movies:', watchedItems.length)
+          console.log('Fetched watched movies:', profileData.watched.length)
         } catch (error) {
           console.error('Error fetching watched movies:', error)
         }
 
         // Get favorites items
-        let favoritesItems = []
         try {
           const favoritesRef = collection(
             db,
@@ -248,54 +275,52 @@ export function AuthProvider({ children }) {
           )
           const favoritesSnapshot = await getDocs(favoritesRef)
 
-          favoritesItems = favoritesSnapshot.docs.map((doc) => {
-            const data = JSON.parse(doc.data().data || '{}')
-            return {
-              id: doc.id,
-              type: data.media_type,
-              title: data.title,
-              poster: data.poster_path,
-              rating: data.vote_average,
-              year: data.release_date ? data.release_date.split('-')[0] : 'N/A',
-            }
-          })
+          profileData.favorites = favoritesSnapshot.docs
+            .map((doc) => {
+              try {
+                const data = JSON.parse(doc.data().data || '{}')
+                return {
+                  id: doc.id,
+                  type: data.media_type || 'movie',
+                  title: data.title || data.name || 'Unknown',
+                  poster: data.poster_path,
+                  rating: data.vote_average,
+                  year: data.release_date
+                    ? data.release_date.split('-')[0]
+                    : 'N/A',
+                  addedAt: doc.data().addedAt,
+                }
+              } catch (parseError) {
+                console.error('Error parsing favorites item:', parseError)
+                return null
+              }
+            })
+            .filter((item) => item !== null) // Remove any items that failed to parse
 
-          console.log('Fetched favorites items:', favoritesItems.length)
+          console.log('Fetched favorites items:', profileData.favorites.length)
         } catch (error) {
           console.error('Error fetching favorites:', error)
         }
 
-        // Build the user profile with real data
-        const userProfile = {
-          uid: currentUser.uid,
-          displayName:
-            userData.displayName || currentUser.displayName || 'Webflix User',
-          username:
-            userData.username || currentUser.email?.split('@')[0] || 'user',
-          email: userData.email || currentUser.email,
-          bio: userData.bio || 'Movie enthusiast and aspiring critic.',
-          favoriteGenres: userData.favoriteGenres || [],
-          watchlist: watchlistItems,
-          favorites: favoritesItems,
-          watched: watchedItems || [],
-        }
-
-        setUserProfile(userProfile)
-        console.log('Fetched user profile from Firestore:', currentUser.uid)
-        return userProfile
+        // Set the profile in state
+        setUserProfile(profileData)
+        return profileData
       } else {
-        // User document doesn't exist, create it
+        // User doc doesn't exist yet, create it
+        console.log('Creating new user profile in Firestore:', currentUser.uid)
+
+        // Create basic profile
         const newUserProfile = {
           uid: currentUser.uid,
           displayName: currentUser.displayName || 'Webflix User',
-          username: currentUser.email?.split('@')[0] || 'user',
+          username: currentUser.email?.split('@')[0] || '',
           email: currentUser.email,
-          bio: 'Movie enthusiast and aspiring critic.',
+          bio: '',
           favoriteGenres: [],
+          createdAt: new Date().toISOString(),
           watchlist: [],
           favorites: [],
           watched: [],
-          createdAt: new Date().toISOString(),
         }
 
         // Create the user document in Firestore
@@ -314,7 +339,7 @@ export function AuthProvider({ children }) {
         displayName: currentUser.displayName || 'Webflix User',
         username: currentUser.email?.split('@')[0] || 'user',
         email: currentUser.email,
-        bio: 'Movie enthusiast and aspiring critic.',
+        bio: '',
         favoriteGenres: [],
         watchlist: [],
         favorites: [],
@@ -354,7 +379,7 @@ export function AuthProvider({ children }) {
         ...userData,
         displayName: profileData.displayName || userData.displayName,
         username: profileData.username || userData.username,
-        bio: profileData.bio || userData.bio,
+        bio: profileData.bio !== undefined ? profileData.bio : userData.bio,
         updatedAt: new Date().toISOString(),
       }
 
@@ -363,10 +388,18 @@ export function AuthProvider({ children }) {
       console.log('Updated user profile in Firestore:', currentUser.uid)
 
       // Update the local profile state with the new data
-      setUserProfile((prev) => ({
-        ...prev,
-        ...profileData,
-      }))
+      setUserProfile((prev) => {
+        if (!prev)
+          return {
+            ...profileData,
+            uid: currentUser.uid,
+          }
+
+        return {
+          ...prev,
+          ...profileData,
+        }
+      })
 
       return { success: true }
     } catch (error) {
@@ -625,13 +658,19 @@ export function AuthProvider({ children }) {
 
       // Update local state
       setUserProfile((prev) => {
-        if (!prev) return null
+        if (!prev)
+          return {
+            uid: currentUser.uid,
+            favoriteGenres: genres,
+          }
+
         return {
           ...prev,
           favoriteGenres: genres,
         }
       })
 
+      console.log('Favorite genres updated successfully')
       return { success: true }
     } catch (error) {
       console.error('Error updating favorite genres:', error)

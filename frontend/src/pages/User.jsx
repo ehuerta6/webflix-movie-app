@@ -82,6 +82,7 @@ function User() {
     removeFromFavorites,
     updateFavoriteGenres,
     removeFromWatched,
+    setUserProfile,
   } = useAuth()
   const [userStats, setUserStats] = useState({
     movieCount: 0,
@@ -89,7 +90,6 @@ function User() {
   })
 
   // API data state
-  const [genreMap, setGenreMap] = useState({})
   const [likedMovies, setLikedMovies] = useState([])
   const [watchlistMovies, setWatchlistMovies] = useState([])
   const [watchedMovies, setWatchedMovies] = useState([])
@@ -157,6 +157,16 @@ function User() {
     }
   }, [userProfile])
 
+  // Fetch user profile on mount and when user changes
+  useEffect(() => {
+    if (currentUser?.uid) {
+      setLoading((prev) => ({ ...prev, profile: true }))
+      fetchUserProfile()
+        .then(() => setLoading((prev) => ({ ...prev, profile: false })))
+        .catch(() => setLoading((prev) => ({ ...prev, profile: false })))
+    }
+  }, [currentUser?.uid])
+
   // Initialize form data when userProfile changes
   useEffect(() => {
     if (userProfile && isEditingProfile) {
@@ -176,13 +186,6 @@ function User() {
     }
   }, [userProfile, isEditingProfile])
 
-  // Fetch user profile on mount and when user changes
-  useEffect(() => {
-    if (currentUser?.uid) {
-      fetchUserProfile()
-    }
-  }, [currentUser?.uid, fetchUserProfile]) // Only reload when the user ID changes or fetchUserProfile changes
-
   // Load genre data for mapping IDs to names
   useEffect(() => {
     const loadGenres = async () => {
@@ -194,23 +197,19 @@ function User() {
           fetchGenres('tv'),
         ])
 
-        // Create genre map and list
-        const map = {}
+        // Create genre list
         const genreNames = new Set()
 
-        // Add movie genres to map
+        // Add movie genres to list
         movieGenres.forEach((genre) => {
-          map[genre.id] = genre.name
           genreNames.add(genre.name)
         })
 
-        // Add TV genres to map (some may overlap)
+        // Add TV genres to list (some may overlap)
         tvGenres.forEach((genre) => {
-          map[genre.id] = genre.name
           genreNames.add(genre.name)
         })
 
-        setGenreMap(map)
         setAvailableGenres([...genreNames].sort())
       } catch (error) {
         console.error('Error fetching genres:', error)
@@ -224,26 +223,43 @@ function User() {
 
   // Load user watchlist and favorites from profile data with improved Firestore compatibility
   useEffect(() => {
-    if (userProfile && Object.keys(genreMap).length > 0) {
+    if (!userProfile) return
+
+    console.log('User profile data updated:', userProfile)
+
+    try {
       // Format favorites data
       if (userProfile.favorites && userProfile.favorites.length > 0) {
+        console.log(
+          'Processing favorites from Firestore:',
+          userProfile.favorites
+        )
+
         const formattedFavorites = userProfile.favorites
-          .filter((item) => item.type === 'movie')
+          .filter((item) => item && item.id) // Ensure the item is valid
           .map((movie) => ({
             id: movie.id,
-            title: movie.title,
+            title: movie.title || 'Unknown Title',
             poster:
-              movie.poster ||
-              'https://via.placeholder.com/342x513?text=No+Image',
-            year: movie.year || 'N/A',
-            rating: movie.rating || 'N/A',
-            // Find genre by ID if available, otherwise use the first available genre
-            genre: movie.genres && movie.genres[0] ? movie.genres[0] : null,
+              movie.poster && movie.poster.startsWith('http')
+                ? movie.poster
+                : movie.poster_path
+                ? `https://image.tmdb.org/t/p/w342${movie.poster_path}`
+                : 'https://via.placeholder.com/342x513?text=No+Image',
+            year:
+              movie.year ||
+              (movie.release_date ? movie.release_date.substring(0, 4) : 'N/A'),
+            rating:
+              movie.rating ||
+              (movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'),
+            genre: movie.genre || 'Drama',
           }))
 
         setLikedMovies(formattedFavorites)
+        console.log('Formatted favorites:', formattedFavorites.length)
       } else {
         setLikedMovies([])
+        console.log('No favorites found in user profile')
       }
 
       // Format watchlist data with improved handling for Firestore data structure
@@ -254,23 +270,29 @@ function User() {
         )
 
         const formattedWatchlist = userProfile.watchlist
-          .filter((item) => item.type === 'movie')
+          .filter((item) => item && item.id) // Ensure the item is valid
           .map((movie) => {
-            // Extract image path from poster field, sometimes it's a full URL, sometimes just a path
-            let posterPath = movie.poster
+            // Extract image path from poster field
+            let posterPath = movie.poster || movie.poster_path
             if (posterPath && !posterPath.startsWith('http')) {
               posterPath = `https://image.tmdb.org/t/p/w342${posterPath}`
             }
 
             return {
               id: movie.id,
-              title: movie.title,
+              title: movie.title || 'Unknown Title',
               poster:
                 posterPath ||
                 'https://via.placeholder.com/342x513?text=No+Image',
-              year: movie.year || 'N/A',
-              rating: movie.rating || 'N/A',
-              genre: movie.genres && movie.genres[0] ? movie.genres[0] : null,
+              year:
+                movie.year ||
+                (movie.release_date
+                  ? movie.release_date.substring(0, 4)
+                  : 'N/A'),
+              rating:
+                movie.rating ||
+                (movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'),
+              genre: movie.genre || 'Drama',
             }
           })
 
@@ -289,23 +311,29 @@ function User() {
         )
 
         const formattedWatched = userProfile.watched
-          .filter((item) => item.type === 'movie')
+          .filter((item) => item && item.id) // Ensure the item is valid
           .map((movie) => {
             // Extract image path from poster field
-            let posterPath = movie.poster
+            let posterPath = movie.poster || movie.poster_path
             if (posterPath && !posterPath.startsWith('http')) {
               posterPath = `https://image.tmdb.org/t/p/w342${posterPath}`
             }
 
             return {
               id: movie.id,
-              title: movie.title,
+              title: movie.title || 'Unknown Title',
               poster:
                 posterPath ||
                 'https://via.placeholder.com/342x513?text=No+Image',
-              year: movie.year || 'N/A',
-              rating: movie.rating || 'N/A',
-              genre: movie.genres && movie.genres[0] ? movie.genres[0] : null,
+              year:
+                movie.year ||
+                (movie.release_date
+                  ? movie.release_date.substring(0, 4)
+                  : 'N/A'),
+              rating:
+                movie.rating ||
+                (movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'),
+              genre: movie.genre || 'Drama',
               watchedAt: movie.watchedAt || 'N/A',
             }
           })
@@ -316,8 +344,10 @@ function User() {
         setWatchedMovies([])
         console.log('No watched movies found in user profile')
       }
+    } catch (error) {
+      console.error('Error formatting user profile data:', error)
     }
-  }, [userProfile, genreMap])
+  }, [userProfile]) // Only depend on userProfile changes
 
   // Event handlers
   const handleGoBack = () => navigate(-1)
@@ -337,23 +367,28 @@ function User() {
   const handleEditFormChange = (e) => {
     const { name, value } = e.target
     setEditForm((prev) => ({ ...prev, [name]: value }))
-    // Clear any previous error when form is changed
-    setProfileError('')
+    setProfileError('') // Clear any previous error when form is changed
   }
 
   const handleGenreToggle = (genre) => {
-    setEditForm((prev) => {
-      const currentGenres = [...prev.selectedGenres]
-      const index = currentGenres.indexOf(genre)
+    // Create a copy of the current selected genres
+    const currentGenres = [...editForm.selectedGenres]
+    const index = currentGenres.indexOf(genre)
 
-      if (index !== -1) {
-        currentGenres.splice(index, 1)
-      } else {
-        currentGenres.push(genre)
-      }
+    // Toggle the genre
+    if (index !== -1) {
+      currentGenres.splice(index, 1)
+    } else {
+      currentGenres.push(genre)
+    }
 
-      return { ...prev, selectedGenres: currentGenres }
+    // Update the form state with the new genres array
+    setEditForm({
+      ...editForm,
+      selectedGenres: currentGenres,
     })
+
+    console.log('Updated selected genres:', currentGenres)
   }
 
   const handleProfileSubmit = async (e) => {
@@ -376,7 +411,7 @@ function User() {
     setProfileError('') // Clear any errors
 
     try {
-      // Prepare update data for user profile
+      // First update the user profile data (except genres)
       const profileData = {
         displayName: editForm.name,
         username: editForm.username,
@@ -384,30 +419,22 @@ function User() {
       }
 
       console.log('Updating user profile in Firestore:', profileData)
-
-      // Update the user profile
       await updateUserProfile(profileData)
 
-      // Separately update favorite genres if they've changed
-      if (
-        JSON.stringify(editForm.selectedGenres) !==
-        JSON.stringify(userProfile?.favoriteGenres || [])
-      ) {
-        console.log(
-          'Updating favorite genres in Firestore:',
-          editForm.selectedGenres
-        )
-        await updateFavoriteGenres(editForm.selectedGenres)
+      // Then separately update favorite genres if they've changed
+      const currentGenres = userProfile?.favoriteGenres || []
+      const newGenres = editForm.selectedGenres || []
+
+      if (JSON.stringify(currentGenres) !== JSON.stringify(newGenres)) {
+        console.log('Updating favorite genres in Firestore:', newGenres)
+        await updateFavoriteGenres(newGenres)
       }
 
-      // Show success message or toast here if you have a UI component for it
-      console.log('Profile successfully updated')
-
-      // Reload the user profile once after updates are complete
-      await fetchUserProfile()
-
-      // Close the editing form
+      // Success! Close the editing form
       setIsEditingProfile(false)
+
+      // Display success message (could be implemented with a toast notification)
+      console.log('Profile successfully updated')
     } catch (error) {
       console.error('Error updating profile:', error)
       setProfileError(error.message || 'Failed to update profile')
@@ -557,6 +584,12 @@ function User() {
 
       // Update local state instead of reloading the entire profile
       setWatchlistMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
+
+      // Also update the userProfile state to keep it in sync
+      setUserProfile((prev) => ({
+        ...prev,
+        watchlist: (prev.watchlist || []).filter((item) => item.id !== mediaId),
+      }))
     } catch (error) {
       console.error('Error removing from watchlist:', error)
     } finally {
@@ -572,6 +605,12 @@ function User() {
 
       // Update local state instead of reloading the entire profile
       setLikedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
+
+      // Also update the userProfile state to keep it in sync
+      setUserProfile((prev) => ({
+        ...prev,
+        favorites: (prev.favorites || []).filter((item) => item.id !== mediaId),
+      }))
     } catch (error) {
       console.error('Error removing from favorites:', error)
     } finally {
@@ -587,6 +626,12 @@ function User() {
 
       // Update local state instead of reloading the entire profile
       setWatchedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
+
+      // Also update the userProfile state to keep it in sync
+      setUserProfile((prev) => ({
+        ...prev,
+        watched: (prev.watched || []).filter((item) => item.id !== mediaId),
+      }))
     } catch (error) {
       console.error('Error removing from watched movies:', error)
     } finally {
