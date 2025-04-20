@@ -9,7 +9,7 @@ import {
   fetchTrending,
 } from '../services/api'
 import Pagination from '../components/Pagination'
-import ResultCard from '../components/ResultCard'
+import MovieCard from '../components/MovieCard'
 import { useAuth } from '../context/AuthContext'
 import { toast } from 'react-hot-toast'
 
@@ -28,6 +28,7 @@ function SearchPage() {
     removeFromWatched,
     addToFavorites,
     removeFromFavorites,
+    fetchUserProfile,
   } = useAuth()
 
   const [searchResults, setSearchResults] = useState([])
@@ -323,7 +324,7 @@ function SearchPage() {
   const displayedContent = searchQuery ? searchResults : popularMovies
 
   // Handle adding to watchlist
-  const handleAddToWatchlist = (movie) => {
+  const handleAddToWatchlist = async (movie) => {
     if (!currentUser) {
       toast.error('Please log in to add to watchlist')
       return
@@ -334,17 +335,39 @@ function SearchPage() {
       (item) => item.id === movie.id
     )
 
-    if (isInWatchlist) {
-      removeFromWatchlist(movie)
-      toast.success(`Removed ${movie.title || movie.name} from watchlist`)
-    } else {
-      addToWatchlist(movie)
-      toast.success(`Added ${movie.title || movie.name} to watchlist`)
+    try {
+      if (isInWatchlist) {
+        await removeFromWatchlist(movie.id, movie.type)
+        toast.success(`Removed ${movie.title || movie.name} from watchlist`)
+      } else {
+        // Format media data for addToWatchlist
+        const formattedMedia = {
+          id: movie.id,
+          title: movie.title || movie.name,
+          poster_path: movie.poster,
+          media_type: movie.type,
+          vote_average: movie.rating ? parseFloat(movie.rating) : 0,
+          release_date: movie.year ? `${movie.year}-01-01` : null,
+          overview: movie.description || '',
+        }
+
+        await addToWatchlist(
+          currentUser.uid,
+          movie.id,
+          JSON.stringify(formattedMedia)
+        )
+        toast.success(`Added ${movie.title || movie.name} to watchlist`)
+      }
+      // Refresh user profile to update UI
+      await fetchUserProfile()
+    } catch (error) {
+      console.error('Error updating watchlist:', error)
+      toast.error('An error occurred. Please try again.')
     }
   }
 
   // Handle adding to favorites
-  const handleAddToFavorites = (movie) => {
+  const handleAddToFavorites = async (movie) => {
     if (!currentUser) {
       toast.error('Please log in to add to favorites')
       return
@@ -355,17 +378,39 @@ function SearchPage() {
       (item) => item.id === movie.id
     )
 
-    if (isFavorite) {
-      removeFromFavorites(movie)
-      toast.success(`Removed ${movie.title || movie.name} from favorites`)
-    } else {
-      addToFavorites(movie)
-      toast.success(`Added ${movie.title || movie.name} to favorites`)
+    try {
+      if (isFavorite) {
+        await removeFromFavorites(movie.id, movie.type)
+        toast.success(`Removed ${movie.title || movie.name} from favorites`)
+      } else {
+        // Format media data for addToFavorites
+        const formattedMedia = {
+          id: movie.id,
+          title: movie.title || movie.name,
+          poster_path: movie.poster,
+          media_type: movie.type,
+          vote_average: movie.rating ? parseFloat(movie.rating) : 0,
+          release_date: movie.year ? `${movie.year}-01-01` : null,
+          overview: movie.description || '',
+        }
+
+        await addToFavorites(
+          currentUser.uid,
+          movie.id,
+          JSON.stringify(formattedMedia)
+        )
+        toast.success(`Added ${movie.title || movie.name} to favorites`)
+      }
+      // Refresh user profile to update UI
+      await fetchUserProfile()
+    } catch (error) {
+      console.error('Error updating favorites:', error)
+      toast.error('An error occurred. Please try again.')
     }
   }
 
   // Handle marking as watched
-  const handleMarkAsWatched = (movie) => {
+  const handleMarkAsWatched = async (movie) => {
     if (!currentUser) {
       toast.error('Please log in to mark as watched')
       return
@@ -374,12 +419,34 @@ function SearchPage() {
     // Check if movie is already in watched
     const isWatched = userProfile?.watched?.some((item) => item.id === movie.id)
 
-    if (isWatched) {
-      removeFromWatched(movie)
-      toast.success(`Removed ${movie.title || movie.name} from watched`)
-    } else {
-      addToWatched(movie)
-      toast.success(`Marked ${movie.title || movie.name} as watched`)
+    try {
+      if (isWatched) {
+        await removeFromWatched(movie.id, movie.type)
+        toast.success(`Removed ${movie.title || movie.name} from watched`)
+      } else {
+        // Format media data for addToWatched
+        const formattedMedia = {
+          id: movie.id,
+          title: movie.title || movie.name,
+          poster_path: movie.poster,
+          media_type: movie.type,
+          vote_average: movie.rating ? parseFloat(movie.rating) : 0,
+          release_date: movie.year ? `${movie.year}-01-01` : null,
+          overview: movie.description || '',
+        }
+
+        await addToWatched(
+          currentUser.uid,
+          movie.id,
+          JSON.stringify(formattedMedia)
+        )
+        toast.success(`Marked ${movie.title || movie.name} as watched`)
+      }
+      // Refresh user profile to update UI
+      await fetchUserProfile()
+    } catch (error) {
+      console.error('Error updating watched status:', error)
+      toast.error('An error occurred. Please try again.')
     }
   }
 
@@ -856,7 +923,7 @@ function SearchPage() {
           {!loading && !loadingPopular && displayedContent.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
               {displayedContent.map((item) => (
-                <ResultCard key={`${item.type}-${item.id}`} result={item} />
+                <MovieCard key={`${item.type}-${item.id}`} movie={item} />
               ))}
             </div>
           )}

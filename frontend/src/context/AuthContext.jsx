@@ -237,6 +237,34 @@ export function AuthProvider({ children }) {
           console.error('Error fetching watched movies:', error)
         }
 
+        // Get favorites items
+        let favoritesItems = []
+        try {
+          const favoritesRef = collection(
+            db,
+            'users',
+            currentUser.uid,
+            'favorites'
+          )
+          const favoritesSnapshot = await getDocs(favoritesRef)
+
+          favoritesItems = favoritesSnapshot.docs.map((doc) => {
+            const data = JSON.parse(doc.data().data || '{}')
+            return {
+              id: doc.id,
+              type: data.media_type,
+              title: data.title,
+              poster: data.poster_path,
+              rating: data.vote_average,
+              year: data.release_date ? data.release_date.split('-')[0] : 'N/A',
+            }
+          })
+
+          console.log('Fetched favorites items:', favoritesItems.length)
+        } catch (error) {
+          console.error('Error fetching favorites:', error)
+        }
+
         // Build the user profile with real data
         const userProfile = {
           uid: currentUser.uid,
@@ -248,7 +276,7 @@ export function AuthProvider({ children }) {
           bio: userData.bio || 'Movie enthusiast and aspiring critic.',
           favoriteGenres: userData.favoriteGenres || [],
           watchlist: watchlistItems,
-          favorites: userData.favorites || [],
+          favorites: favoritesItems,
           watched: watchedItems || [],
         }
 
@@ -266,6 +294,7 @@ export function AuthProvider({ children }) {
           favoriteGenres: [],
           watchlist: [],
           favorites: [],
+          watched: [],
           createdAt: new Date().toISOString(),
         }
 
@@ -289,6 +318,7 @@ export function AuthProvider({ children }) {
         favoriteGenres: [],
         watchlist: [],
         favorites: [],
+        watched: [],
       }
 
       setUserProfile(fallbackProfile)
@@ -427,6 +457,9 @@ export function AuthProvider({ children }) {
           console.log('Item already in favorites')
           return prev
         }
+
+        // Add timestamp
+        mediaItem.addedAt = new Date().toISOString()
 
         return {
           ...prev,
