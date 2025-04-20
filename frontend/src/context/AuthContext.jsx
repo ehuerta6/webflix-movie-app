@@ -27,11 +27,7 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const {
-    addToWatchlist: addToWatchlistFirestore,
-    removeFromWatchlist: removeFromWatchlistFirestore,
-    getWatchlist,
-  } = useFireStore()
+  const { addToWatchlist } = useFireStore()
 
   // Login with email and password
   const login = async (email, password) => {
@@ -169,7 +165,7 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Fetch user profile - now fetches watchlist from Firestore
+  // Fetch user profile - simple implementation with empty watchlist
   const fetchUserProfile = async () => {
     if (!currentUser) return null
 
@@ -182,18 +178,12 @@ export function AuthProvider({ children }) {
         email: currentUser.email,
         bio: 'Movie enthusiast and aspiring critic.',
         favoriteGenres: [],
+        watchlist: [], // Empty watchlist for now
         favorites: [],
       }
 
-      // Fetch actual watchlist from Firestore
-      const watchlist = await getWatchlist(currentUser.uid)
-      mockUserProfile.watchlist = watchlist || []
-
       setUserProfile(mockUserProfile)
-      console.log(
-        'Fetched user profile with watchlist from Firestore:',
-        currentUser.uid
-      )
+      console.log('Fetched user profile (mock):', currentUser.uid)
       return mockUserProfile
     } catch (error) {
       console.error('Error fetching user profile:', error)
@@ -229,74 +219,14 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Add to watchlist - now uses Firestore
-  const addToWatchlist = async (media) => {
-    try {
-      if (!currentUser) throw new Error('No user is currently logged in')
-
-      const mediaItem = {
-        id: media.id,
-        type: media.media_type || media.type,
-        title: media.title || media.name,
-        poster: media.poster_path
-          ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
-          : null,
-        backdrop: media.backdrop_path
-          ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`
-          : null,
-        rating: media.vote_average ? media.vote_average.toFixed(1) : '0.0',
-        year: media.release_date
-          ? media.release_date.split('-')[0]
-          : media.first_air_date
-          ? media.first_air_date.split('-')[0]
-          : 'N/A',
-        added_at: new Date().toISOString(),
-      }
-
-      console.log('Adding to watchlist in Firestore:', mediaItem)
-
-      // Save to Firestore
-      await addToWatchlistFirestore(currentUser.uid, mediaItem)
-
-      // Update local state
-      setUserProfile((prev) => {
-        if (!prev) return null
-
-        const watchlist = prev.watchlist || []
-        // Check if item already exists
-        const existingItem = watchlist.find(
-          (item) => item.id === mediaItem.id && item.type === mediaItem.type
-        )
-
-        if (existingItem) {
-          console.log('Item already in watchlist')
-          return prev
-        }
-
-        return {
-          ...prev,
-          watchlist: [...watchlist, mediaItem],
-        }
-      })
-
-      return { success: true }
-    } catch (error) {
-      console.error('Error adding to watchlist:', error)
-      throw error
-    }
-  }
-
-  // Remove from watchlist - now uses Firestore
+  // Remove from watchlist - local state only
   const removeFromWatchlist = async (mediaId, mediaType) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
 
-      console.log('Removing from watchlist in Firestore:', mediaId, mediaType)
+      console.log('Removing from watchlist:', mediaId, mediaType)
 
-      // Remove from Firestore
-      await removeFromWatchlistFirestore(currentUser.uid, mediaId)
-
-      // Update local state
+      // Update local state only
       setUserProfile((prev) => {
         if (!prev) return null
 

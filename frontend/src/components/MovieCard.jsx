@@ -14,7 +14,7 @@ const MovieCard = memo(function MovieCard({ movie }) {
 
     console.log('Adding to watchlist:', movie)
     try {
-      if (addToWatchlist) {
+      if (addToWatchlist && currentUser) {
         // Format movie data as needed for our updated addToWatchlist function
         const mediaToAdd = {
           id: id,
@@ -25,10 +25,18 @@ const MovieCard = memo(function MovieCard({ movie }) {
           release_date: year ? `${year}-01-01` : null,
         }
 
-        await addToWatchlist(mediaToAdd)
+        // Call the Firestore function with the right parameters
+        await addToWatchlist(
+          currentUser.uid,
+          id, // media ID as second parameter
+          JSON.stringify(mediaToAdd) // stringified media object as third parameter
+        )
+
         console.log('Successfully added to watchlist!')
       } else {
-        console.log('addToWatchlist function not found in AuthContext')
+        console.log(
+          'addToWatchlist function not found in AuthContext or user not logged in'
+        )
       }
     } catch (error) {
       console.error('Error adding to watchlist:', error)
