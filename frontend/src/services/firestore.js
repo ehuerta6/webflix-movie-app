@@ -1,5 +1,5 @@
 import { db } from '../services/firebase'
-import { addDoc, collection } from 'firebase/firestore'
+import { addDoc, setDoc, doc, collection, deleteDoc } from 'firebase/firestore'
 
 export const useFireStore = () => {
   const addDocument = async (collectionName, data) => {
@@ -9,12 +9,11 @@ export const useFireStore = () => {
 
   const addToWatchlist = async (userId, mediaId, mediaData) => {
     try {
-      // First, create a reference to the user's watchlist collection
-      const watchlistCollection = collection(db, 'users', userId, 'watchlist')
+      // Create a document reference with the mediaId as the document ID
+      const docRef = doc(db, 'users', userId, 'watchlist', mediaId.toString())
 
-      // Then create a document in that collection
-      await addDoc(watchlistCollection, {
-        mediaId: mediaId.toString(),
+      // Set the document data
+      await setDoc(docRef, {
         data: mediaData,
         addedAt: new Date().toISOString(),
       })
@@ -27,8 +26,62 @@ export const useFireStore = () => {
     }
   }
 
+  const removeFromWatchlist = async (userId, mediaId) => {
+    try {
+      // Create a document reference with the mediaId
+      const docRef = doc(db, 'users', userId, 'watchlist', mediaId.toString())
+
+      // Delete the document
+      await deleteDoc(docRef)
+
+      console.log('Removed from watchlist in Firestore:', mediaId)
+      return true
+    } catch (error) {
+      console.error('Error removing from watchlist:', error)
+      throw error
+    }
+  }
+
+  const addToFavorites = async (userId, mediaId, mediaData) => {
+    try {
+      // Create a document reference with the mediaId as the document ID
+      const docRef = doc(db, 'users', userId, 'favorites', mediaId.toString())
+
+      // Set the document data
+      await setDoc(docRef, {
+        data: mediaData,
+        addedAt: new Date().toISOString(),
+      })
+
+      console.log('Added to favorites in Firestore:', mediaId)
+      return true
+    } catch (error) {
+      console.error('Error adding to favorites:', error)
+      throw error
+    }
+  }
+
+  const removeFromFavorites = async (userId, mediaId) => {
+    try {
+      // Create a document reference with the mediaId
+      const docRef = doc(db, 'users', userId, 'favorites', mediaId.toString())
+
+      // Delete the document
+      await deleteDoc(docRef)
+
+      console.log('Removed from favorites in Firestore:', mediaId)
+      return true
+    } catch (error) {
+      console.error('Error removing from favorites:', error)
+      throw error
+    }
+  }
+
   return {
     addDocument,
     addToWatchlist,
+    removeFromWatchlist,
+    addToFavorites,
+    removeFromFavorites,
   }
 }

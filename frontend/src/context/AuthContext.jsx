@@ -13,7 +13,7 @@ import {
   reauthenticateWithCredential,
   updateEmail,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore'
 import { useFireStore } from '../services/firestore'
 
 const AuthContext = createContext()
@@ -27,7 +27,12 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const { addToWatchlist } = useFireStore()
+  const {
+    addToWatchlist,
+    removeFromWatchlist: removeWatchlistItem,
+    addToFavorites: addFavoritesItem,
+    removeFromFavorites: removeFavoritesItem,
+  } = useFireStore()
 
   // Login with email and password
   const login = async (email, password) => {
@@ -165,29 +170,102 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Fetch user profile - simple implementation with empty watchlist
+  // Fetch user profile from Firestore
   const fetchUserProfile = async () => {
     if (!currentUser) return null
 
     try {
-      // Mock user profile data for most fields
-      const mockUserProfile = {
+      // Get user document from Firestore
+      const userDocRef = doc(db, 'users', currentUser.uid)
+      const userDoc = await getDoc(userDocRef)
+
+      if (userDoc.exists()) {
+        // Get the user data from the document
+        const userData = userDoc.data()
+
+        // Get watchlist items
+        let watchlistItems = []
+        try {
+          const watchlistRef = collection(
+            db,
+            'users',
+            currentUser.uid,
+            'watchlist'
+          )
+          const watchlistSnapshot = await getDocs(watchlistRef)
+
+          watchlistItems = watchlistSnapshot.docs.map((doc) => {
+            const data = JSON.parse(doc.data().data || '{}')
+            return {
+              id: doc.id,
+              type: data.media_type,
+              title: data.title,
+              poster: data.poster_path,
+              rating: data.vote_average,
+              year: data.release_date ? data.release_date.split('-')[0] : 'N/A',
+            }
+          })
+
+          console.log('Fetched watchlist items:', watchlistItems.length)
+        } catch (error) {
+          console.error('Error fetching watchlist:', error)
+        }
+
+        // Build the user profile with real data
+        const userProfile = {
+          uid: currentUser.uid,
+          displayName:
+            userData.displayName || currentUser.displayName || 'Webflix User',
+          username:
+            userData.username || currentUser.email?.split('@')[0] || 'user',
+          email: userData.email || currentUser.email,
+          bio: userData.bio || 'Movie enthusiast and aspiring critic.',
+          favoriteGenres: userData.favoriteGenres || [],
+          watchlist: watchlistItems,
+          favorites: userData.favorites || [],
+        }
+
+        setUserProfile(userProfile)
+        console.log('Fetched user profile from Firestore:', currentUser.uid)
+        return userProfile
+      } else {
+        // User document doesn't exist, create it
+        const newUserProfile = {
+          uid: currentUser.uid,
+          displayName: currentUser.displayName || 'Webflix User',
+          username: currentUser.email?.split('@')[0] || 'user',
+          email: currentUser.email,
+          bio: 'Movie enthusiast and aspiring critic.',
+          favoriteGenres: [],
+          watchlist: [],
+          favorites: [],
+          createdAt: new Date().toISOString(),
+        }
+
+        // Create the user document in Firestore
+        await setDoc(userDocRef, newUserProfile)
+
+        setUserProfile(newUserProfile)
+        console.log('Created new user profile in Firestore:', currentUser.uid)
+        return newUserProfile
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error)
+
+      // Fallback to basic profile if Firestore fails
+      const fallbackProfile = {
         uid: currentUser.uid,
         displayName: currentUser.displayName || 'Webflix User',
         username: currentUser.email?.split('@')[0] || 'user',
         email: currentUser.email,
         bio: 'Movie enthusiast and aspiring critic.',
         favoriteGenres: [],
-        watchlist: [], // Empty watchlist for now
+        watchlist: [],
         favorites: [],
       }
 
-      setUserProfile(mockUserProfile)
-      console.log('Fetched user profile (mock):', currentUser.uid)
-      return mockUserProfile
-    } catch (error) {
-      console.error('Error fetching user profile:', error)
-      return null
+      setUserProfile(fallbackProfile)
+      return fallbackProfile
     }
   }
 
@@ -219,14 +297,17 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Remove from watchlist - local state only
+  // Remove from watchlist - using Firestore
   const removeFromWatchlist = async (mediaId, mediaType) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
 
       console.log('Removing from watchlist:', mediaId, mediaType)
 
-      // Update local state only
+      // Remove from Firestore first
+      await removeWatchlistItem(currentUser.uid, mediaId)
+
+      // Then update local state
       setUserProfile((prev) => {
         if (!prev) return null
 
@@ -248,10 +329,14 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Add to favorites - placeholder implementation
-  const addToFavorites = async (media) => {
+  // Add to favorites - using Firestore
+  const addToFavorites = async (userId, mediaId, mediaData) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
+
+      // Parse the media data if it's a string
+      const media =
+        typeof mediaData === 'string' ? JSON.parse(mediaData) : mediaData
 
       const mediaItem = {
         id: media.id,
@@ -271,12 +356,16 @@ export function AuthProvider({ children }) {
           : 'N/A',
       }
 
-      console.log(
-        'Adding to favorites (will implement database later):',
-        mediaItem
+      console.log('Adding to favorites:', mediaItem)
+
+      // Add to Firestore first
+      await addFavoritesItem(
+        currentUser.uid,
+        mediaItem.id,
+        JSON.stringify(mediaItem)
       )
 
-      // Update local state
+      // Then update local state
       setUserProfile((prev) => {
         if (!prev) return null
 
@@ -304,18 +393,17 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Remove from favorites - placeholder implementation
+  // Remove from favorites - using Firestore
   const removeFromFavorites = async (mediaId, mediaType) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
 
-      console.log(
-        'Removing from favorites (will implement database later):',
-        mediaId,
-        mediaType
-      )
+      console.log('Removing from favorites:', mediaId, mediaType)
 
-      // Update local state
+      // Remove from Firestore first
+      await removeFavoritesItem(currentUser.uid, mediaId)
+
+      // Then update local state
       setUserProfile((prev) => {
         if (!prev) return null
 

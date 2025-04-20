@@ -13,6 +13,7 @@ function MediaActions({ media }) {
     removeFromWatchlist,
     addToFavorites,
     removeFromFavorites,
+    fetchUserProfile,
   } = useAuth()
 
   const [isInWatchlist, setIsInWatchlist] = useState(false)
@@ -76,8 +77,16 @@ function MediaActions({ media }) {
         }
 
         console.log('Adding to watchlist:', formattedMedia)
-        await addToWatchlist(formattedMedia)
+        // Pass all three required parameters: userId, mediaId, and stringified media data
+        await addToWatchlist(
+          currentUser.uid,
+          formattedMedia.id,
+          JSON.stringify(formattedMedia)
+        )
       }
+
+      // Refresh user profile data to get updated watchlist
+      await fetchUserProfile()
     } catch (error) {
       console.error('Error updating watchlist:', error)
     } finally {
@@ -116,8 +125,16 @@ function MediaActions({ media }) {
         }
 
         console.log('Adding to favorites:', formattedMedia)
-        await addToFavorites(formattedMedia)
+        // Update to match the updated addToFavorites function signature
+        await addToFavorites(
+          currentUser.uid,
+          formattedMedia.id,
+          JSON.stringify(formattedMedia)
+        )
       }
+
+      // Refresh user profile data to get updated favorites
+      await fetchUserProfile()
     } catch (error) {
       console.error('Error updating favorites:', error)
     } finally {

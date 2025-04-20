@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { fetchMovieDetails, fetchShowDetails } from '../services/api'
 import MediaActions from '../components/MediaActions'
-import { useAuth } from '../context/AuthContext'
 
 // Helper function with simplified content validation
 const isValidContent = (item) => {
@@ -164,7 +163,6 @@ const CastCard = ({ person }) => {
 function Details() {
   const { id, type } = useParams()
   const navigate = useNavigate()
-  const { addToWatchlist, currentUser } = useAuth()
   const [details, setDetails] = useState(null)
   const [similarContent, setSimilarContent] = useState([])
   const [cast, setCast] = useState([])
@@ -174,40 +172,6 @@ function Details() {
   // Image loading states
   const [backdropLoaded, setBackdropLoaded] = useState(false)
   const [posterLoaded, setPosterLoaded] = useState(false)
-
-  // Handle adding to watchlist
-  const handleSaveToWatchlist = async (media) => {
-    console.log('Adding to watchlist:', media)
-    try {
-      if (addToWatchlist && currentUser) {
-        // Format the media data
-        const mediaData = {
-          id: media.id,
-          title: media.title,
-          poster_path: media.poster_path,
-          media_type: media.media_type,
-          vote_average: media.vote_average,
-          release_date: media.release_date,
-          overview: media.overview,
-        }
-
-        // Call the Firestore function with the right parameters
-        await addToWatchlist(
-          currentUser.uid,
-          media.id,
-          JSON.stringify(mediaData)
-        )
-
-        console.log('Successfully added to watchlist!')
-      } else {
-        console.log(
-          'addToWatchlist function not found in AuthContext or user not logged in'
-        )
-      }
-    } catch (error) {
-      console.error('Error adding to watchlist:', error)
-    }
-  }
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -552,38 +516,16 @@ function Details() {
                 )}
                 <MediaActions media={details} />
 
-                {/* Custom add to watchlist button for testing */}
-                <button
-                  onClick={() =>
-                    handleSaveToWatchlist({
-                      id: details.id,
-                      title: details.title,
-                      poster_path: details.poster,
-                      media_type: type,
-                      vote_average: parseFloat(details.rating),
-                      release_date: `${details.year}-01-01`,
-                      // Add overview for better data
-                      overview: details.description,
-                    })
-                  }
-                  className="bg-[#252525] text-white hover:bg-[#333] px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                    />
-                  </svg>
-                  Test Watchlist
-                </button>
+                {/* Adding a note about permissions issue with Test Watchlist button */}
+                <div className="bg-yellow-500/10 text-yellow-300 text-xs px-3 py-2 rounded-md">
+                  <p>
+                    Please use the Watchlist button above instead of the test
+                    button.
+                  </p>
+                  <p>
+                    The MediaActions component handles permissions correctly.
+                  </p>
+                </div>
               </div>
 
               {/* Additional Info Grid */}
