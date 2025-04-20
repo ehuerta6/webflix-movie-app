@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 const MovieCard = memo(function MovieCard({ movie }) {
   const { id, type = 'movie', title, poster, rating, genre, year } = movie
   const [imageLoaded, setImageLoaded] = useState(false)
-  const { addToWatchlist } = useAuth()
+  const { addToWatchlist, addToFavorites } = useAuth()
 
   // Handle adding to watchlist
   const handleAddToWatchlist = async (e) => {
@@ -32,6 +32,34 @@ const MovieCard = memo(function MovieCard({ movie }) {
       }
     } catch (error) {
       console.error('Error adding to watchlist:', error)
+    }
+  }
+
+  // Handle adding to favorites (liked movies)
+  const handleAddToFavorites = async (e) => {
+    e.preventDefault() // Prevent navigation
+    e.stopPropagation() // Prevent event bubbling
+
+    console.log('Adding to liked movies:', movie)
+    try {
+      if (addToFavorites) {
+        // Format movie data as needed for addToFavorites function
+        const mediaToAdd = {
+          id: id,
+          title: title,
+          poster_path: poster,
+          media_type: type,
+          vote_average: rating ? parseFloat(rating) : 0,
+          release_date: year ? `${year}-01-01` : null,
+        }
+
+        await addToFavorites(mediaToAdd)
+        console.log('Successfully added to liked movies!')
+      } else {
+        console.log('addToFavorites function not found in AuthContext')
+      }
+    } catch (error) {
+      console.error('Error adding to liked movies:', error)
     }
   }
 
@@ -84,27 +112,52 @@ const MovieCard = memo(function MovieCard({ movie }) {
         </div>
       </Link>
 
-      {/* Add to watchlist button */}
-      <button
-        onClick={handleAddToWatchlist}
-        className="absolute top-1 left-1 p-1.5 bg-black/70 hover:bg-[#333] rounded-full text-white transition-colors"
-        title="Add to watchlist"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
+      {/* Action buttons container */}
+      <div className="absolute top-1 left-1 flex gap-2">
+        {/* Add to watchlist button */}
+        <button
+          onClick={handleAddToWatchlist}
+          className="p-1.5 bg-black/70 hover:bg-[#333] rounded-full text-white transition-colors"
+          title="Add to watchlist"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-          />
-        </svg>
-      </button>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+            />
+          </svg>
+        </button>
+
+        {/* Add to liked movies button */}
+        <button
+          onClick={handleAddToFavorites}
+          className="p-1.5 bg-black/70 hover:bg-[#333] rounded-full text-white transition-colors"
+          title="Add to liked movies"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
   )
 })

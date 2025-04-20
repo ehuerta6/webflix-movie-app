@@ -174,3 +174,25 @@ export const getTMDBImageUrl = (path, size = 'w500') => {
   if (!path) return null
   return `${IMAGE_BASE_URL}/${size}${path}`
 }
+
+/**
+ * Preload images for smoother UI transitions
+ * @param {Array<string>} imageUrls - Array of image URLs to preload
+ * @returns {Promise<void>}
+ */
+export const preloadImages = (imageUrls) => {
+  if (!imageUrls || !imageUrls.length) return Promise.resolve()
+
+  const promises = imageUrls.map((url) => {
+    if (!url) return Promise.resolve()
+
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve()
+      img.onerror = () => resolve() // Resolve even on error to avoid blocking
+      img.src = url
+    })
+  })
+
+  return Promise.all(promises)
+}

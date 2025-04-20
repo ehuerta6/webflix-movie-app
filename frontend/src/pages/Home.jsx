@@ -4,6 +4,18 @@ import MovieCard from '../components/MovieCard'
 import { fetchTrending, fetchMovies, fetchShows } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 
+// Utility function to preload images for smoother UI
+const preloadImages = (imageUrls) => {
+  if (!imageUrls || !imageUrls.length) return
+
+  imageUrls.forEach((url) => {
+    if (url) {
+      const img = new Image()
+      img.src = url
+    }
+  })
+}
+
 // Helper function to validate if a movie/show has all required fields
 const isValidContent = (item) => {
   if (!item) return false
@@ -30,7 +42,6 @@ function Home() {
   const [featured, setFeatured] = useState(null)
   const [featuredItems, setFeaturedItems] = useState([])
   const [currentFeaturedIndex, setCurrentFeaturedIndex] = useState(0)
-  const [inTheaters, setInTheaters] = useState([])
   const [popular, setPopular] = useState([])
   const [topRatedMovies, setTopRatedMovies] = useState([])
   const [topRatedShows, setTopRatedShows] = useState([])
@@ -182,18 +193,8 @@ function Home() {
               .slice(0, 5)
               .map((item) => formatMovieData(item))
 
-            // Preload backdrop images for smoother carousel
-            const backdropUrls = featuredItems
-              .map((item) => item.backdrop)
-              .filter(Boolean)
-
-            if (backdropUrls.length) {
-              // Start preloading in background
-              import('../services/api').then((api) => {
-                api.preloadImages(backdropUrls).catch(() => {}) // Ignore preload errors
-              })
-            }
-
+            // Preload backdrop images for smoother carousel transitions
+            preloadImages(featuredItems.map((item) => item.backdrop))
             setFeaturedItems(featuredItems)
             setFeatured(featuredItems[0]) // Set the first item as initial featured
 
@@ -205,9 +206,6 @@ function Home() {
             setPopular(formattedPopular)
           }
         }
-
-        // We're removing the "In Theaters" section as requested
-        setInTheaters([])
 
         // Fetch top rated movies
         const topMoviesData = await fetchMovies({
@@ -243,16 +241,21 @@ function Home() {
           setTopRatedShows(formattedTopShows)
         }
 
-        setLoading(false)
-      } catch (err) {
-        console.error('Error fetching home page data:', err)
-        setError('Failed to load content. Please try again later.')
+        if (error) console.error('Error fetching home page data:', error)
+      } finally {
         setLoading(false)
       }
     }
 
     fetchHomeData()
-  }, [])
+
+    // Cleanup function
+    return () => {
+      if (carouselTimerRef.current) {
+        clearInterval(carouselTimerRef.current)
+      }
+    }
+  }, []) // Run once on component mount
 
   // Update featured item when currentFeaturedIndex changes
   useEffect(() => {
