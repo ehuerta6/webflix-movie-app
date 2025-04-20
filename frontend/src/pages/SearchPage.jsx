@@ -11,6 +11,7 @@ import {
 import Pagination from '../components/Pagination'
 import ResultCard from '../components/ResultCard'
 import { useAuth } from '../context/AuthContext'
+import { toast } from 'react-hot-toast'
 
 function SearchPage() {
   const location = useLocation()
@@ -18,7 +19,16 @@ function SearchPage() {
   const queryParams = new URLSearchParams(location.search)
   const searchQuery = queryParams.get('q') || ''
   const [searchInput, setSearchInput] = useState(searchQuery)
-  const { currentUser, addToWatchlist } = useAuth()
+  const {
+    currentUser,
+    addToWatchlist,
+    addToWatched,
+    userProfile,
+    removeFromWatchlist,
+    removeFromWatched,
+    addToFavorites,
+    removeFromFavorites,
+  } = useAuth()
 
   const [searchResults, setSearchResults] = useState([])
   const [popularMovies, setPopularMovies] = useState([])
@@ -151,12 +161,27 @@ function SearchPage() {
 
   // Clean up carousel timer on unmount
   useEffect(() => {
+    if (featuredItems.length > 0) {
+      // Clear previous timer if exists
+      if (carouselTimerRef.current) {
+        clearInterval(carouselTimerRef.current)
+      }
+
+      // Set new timer
+      carouselTimerRef.current = setInterval(() => {
+        setCurrentFeaturedIndex((prevIndex) =>
+          prevIndex === featuredItems.length - 1 ? 0 : prevIndex + 1
+        )
+      }, 8000)
+    }
+
+    // Cleanup on unmount
     return () => {
       if (carouselTimerRef.current) {
         clearInterval(carouselTimerRef.current)
       }
     }
-  }, [])
+  }, [featuredItems])
 
   const loadPopularMovies = async () => {
     setLoadingPopular(true)
@@ -215,19 +240,6 @@ function SearchPage() {
           const formattedFeatured = validFeatured.map(formatMovieData)
           setFeaturedItems(formattedFeatured)
           setFeatured(formattedFeatured[0])
-
-          // Set up auto-rotation
-          if (carouselTimerRef.current) {
-            clearInterval(carouselTimerRef.current)
-          }
-
-          carouselTimerRef.current = setInterval(() => {
-            setCurrentFeaturedIndex((prev) => {
-              const nextIndex = (prev + 1) % formattedFeatured.length
-              setFeatured(formattedFeatured[nextIndex])
-              return nextIndex
-            })
-          }, 8000) // Rotate every 8 seconds
         }
       }
     } catch (err) {
@@ -311,38 +323,63 @@ function SearchPage() {
   const displayedContent = searchQuery ? searchResults : popularMovies
 
   // Handle adding to watchlist
-  const handleAddToWatchlist = async (media) => {
-    try {
-      if (!addToWatchlist || !currentUser) {
-        console.log(
-          'addToWatchlist function not found in AuthContext or user not logged in'
-        )
-        return
-      }
+  const handleAddToWatchlist = (movie) => {
+    if (!currentUser) {
+      toast.error('Please log in to add to watchlist')
+      return
+    }
 
-      // Format the media data for the addToWatchlist function
-      const formattedMedia = {
-        id: media.id,
-        title: media.title,
-        poster_path: media.poster,
-        media_type: media.type,
-        vote_average: parseFloat(media.rating),
-        release_date: `${media.year}-01-01`,
-        overview: media.description,
-      }
+    // Check if movie is already in watchlist
+    const isInWatchlist = userProfile?.watchlist?.some(
+      (item) => item.id === movie.id
+    )
 
-      console.log('Adding to watchlist:', formattedMedia)
+    if (isInWatchlist) {
+      removeFromWatchlist(movie)
+      toast.success(`Removed ${movie.title || movie.name} from watchlist`)
+    } else {
+      addToWatchlist(movie)
+      toast.success(`Added ${movie.title || movie.name} to watchlist`)
+    }
+  }
 
-      // Call the Firestore function with the right parameters
-      await addToWatchlist(
-        currentUser.uid,
-        media.id,
-        JSON.stringify(formattedMedia)
-      )
+  // Handle adding to favorites
+  const handleAddToFavorites = (movie) => {
+    if (!currentUser) {
+      toast.error('Please log in to add to favorites')
+      return
+    }
 
-      console.log('Successfully added to watchlist!')
-    } catch (error) {
-      console.error('Error adding to watchlist:', error)
+    // Check if movie is already in favorites
+    const isFavorite = userProfile?.favorites?.some(
+      (item) => item.id === movie.id
+    )
+
+    if (isFavorite) {
+      removeFromFavorites(movie)
+      toast.success(`Removed ${movie.title || movie.name} from favorites`)
+    } else {
+      addToFavorites(movie)
+      toast.success(`Added ${movie.title || movie.name} to favorites`)
+    }
+  }
+
+  // Handle marking as watched
+  const handleMarkAsWatched = (movie) => {
+    if (!currentUser) {
+      toast.error('Please log in to mark as watched')
+      return
+    }
+
+    // Check if movie is already in watched
+    const isWatched = userProfile?.watched?.some((item) => item.id === movie.id)
+
+    if (isWatched) {
+      removeFromWatched(movie)
+      toast.success(`Removed ${movie.title || movie.name} from watched`)
+    } else {
+      addToWatched(movie)
+      toast.success(`Marked ${movie.title || movie.name} as watched`)
     }
   }
 
@@ -480,32 +517,22 @@ function SearchPage() {
                 {movie.description}
               </p>
 
-              <div
-                className="flex gap-3 mt-4"
-                key={`buttons-${movie.id}`}
-                style={{
-                  animation: 'slideUp 800ms ease-out forwards',
-                  animationDelay: '200ms',
-                  opacity: 0,
-                }}
-              >
-                <Link
-                  to={`/${movie.type}/${movie.id}`}
-                  className="inline-block bg-[#5ccfee] text-black font-medium px-5 py-2 rounded hover:bg-[#4abfe0] transition-colors mr-3 flex items-center gap-1 group"
-                >
-                  <span className="transform transition-transform group-hover:scale-110">
-                    ▶
-                  </span>{' '}
-                  Watch
-                </Link>
-                {currentUser && (
+              {/* Featured component buttons */}
+              {currentUser && (
+                <div className="featured-buttons mt-4 flex gap-3">
                   <button
                     onClick={() => handleAddToWatchlist(movie)}
-                    className="inline-block bg-transparent border border-white text-white px-5 py-2 rounded hover:bg-[#5ccfee20] transition-colors flex items-center gap-1"
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                      userProfile?.watchlist?.some(
+                        (item) => item.id === movie.id
+                      )
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-800 text-white'
+                    }`}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
+                      className="h-5 w-5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -514,13 +541,79 @@ function SearchPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                        d="M12 4v16m8-8H4"
                       />
                     </svg>
-                    Add to Watchlist
+                    {userProfile?.watchlist?.some(
+                      (item) => item.id === movie.id
+                    )
+                      ? 'In Watchlist'
+                      : 'Add to Watchlist'}
                   </button>
-                )}
-              </div>
+                  <button
+                    onClick={() => handleMarkAsWatched(movie)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                      userProfile?.watched?.some((item) => item.id === movie.id)
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-800 text-white'
+                    }`}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    {userProfile?.watched?.some((item) => item.id === movie.id)
+                      ? 'Watched'
+                      : 'Mark as Watched'}
+                  </button>
+                  <button
+                    onClick={() => handleAddToFavorites(movie)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                      userProfile?.favorites?.some(
+                        (item) => item.id === movie.id
+                      )
+                        ? 'bg-red-600 text-white'
+                        : 'bg-gray-800 text-white'
+                    }`}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d={
+                          userProfile?.favorites?.some(
+                            (item) => item.id === movie.id
+                          )
+                            ? 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z'
+                            : 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z'
+                        }
+                      />
+                    </svg>
+                    {userProfile?.favorites?.some(
+                      (item) => item.id === movie.id
+                    )
+                      ? 'Favorited'
+                      : 'Add to Favorites'}
+                  </button>
+                </div>
+              )}
 
               {/* Carousel indicators */}
               {featuredItems.length > 1 && (

@@ -48,7 +48,16 @@ function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const carouselTimerRef = useRef(null)
-  const { currentUser, addToWatchlist } = useAuth()
+  const {
+    currentUser,
+    addToWatchlist,
+    addToWatched,
+    userProfile,
+    removeFromWatchlist,
+    removeFromWatched,
+    addToFavorites,
+    removeFromFavorites,
+  } = useAuth()
 
   // Format movie data to be consistent with MovieCard component
   const formatMovieData = (movie) => ({
@@ -114,22 +123,21 @@ function Home() {
       : []
   }
 
-  // Function to rotate featured items
+  // Auto-rotate featured items
   const rotateFeatured = useCallback(() => {
     setCurrentFeaturedIndex((prevIndex) =>
       prevIndex === featuredItems.length - 1 ? 0 : prevIndex + 1
     )
   }, [featuredItems.length])
 
-  // Set up automatic rotation
+  // Set up carousel timer
   useEffect(() => {
     if (featuredItems.length > 1) {
-      carouselTimerRef.current = setInterval(rotateFeatured, 8000) // Rotate every 8 seconds
-
-      return () => {
-        if (carouselTimerRef.current) {
-          clearInterval(carouselTimerRef.current)
-        }
+      carouselTimerRef.current = setInterval(rotateFeatured, 8000)
+    }
+    return () => {
+      if (carouselTimerRef.current) {
+        clearInterval(carouselTimerRef.current)
       }
     }
   }, [featuredItems.length, rotateFeatured])
@@ -147,36 +155,138 @@ function Home() {
   // Handle adding to watchlist
   const handleAddToWatchlist = async (media) => {
     try {
-      if (!addToWatchlist || !currentUser) {
-        console.log(
-          'addToWatchlist function not found in AuthContext or user not logged in'
-        )
+      if (!currentUser) {
+        console.log('User not logged in')
         return
       }
 
-      // Format the media data for the addToWatchlist function
-      const formattedMedia = {
-        id: media.id,
-        title: media.title,
-        poster_path: media.poster,
-        media_type: media.type,
-        vote_average: parseFloat(media.rating),
-        release_date: `${media.year}-01-01`,
-        overview: media.description,
-      }
-
-      console.log('Adding to watchlist:', formattedMedia)
-
-      // Call the Firestore function with the right parameters
-      await addToWatchlist(
-        currentUser.uid,
-        media.id,
-        JSON.stringify(formattedMedia)
+      // Check if movie is already in watchlist
+      const isInWatchlist = userProfile?.watchlist?.some(
+        (item) => item.id === media.id && item.type === media.type
       )
 
-      console.log('Successfully added to watchlist!')
+      if (isInWatchlist) {
+        // Remove from watchlist
+        console.log('Removing from watchlist:', media)
+        await removeFromWatchlist(media.id, media.type)
+        console.log('Successfully removed from watchlist!')
+      } else {
+        // Add to watchlist
+        console.log('Adding to watchlist:', media)
+
+        // Format the media data for the addToWatchlist function
+        const formattedMedia = {
+          id: media.id,
+          title: media.title,
+          poster_path: media.poster,
+          media_type: media.type,
+          vote_average: parseFloat(media.rating),
+          release_date: `${media.year}-01-01`,
+          overview: media.description,
+        }
+
+        // Call the Firestore function with the right parameters
+        await addToWatchlist(
+          currentUser.uid,
+          media.id,
+          JSON.stringify(formattedMedia)
+        )
+        console.log('Successfully added to watchlist!')
+      }
     } catch (error) {
-      console.error('Error adding to watchlist:', error)
+      console.error('Error handling watchlist:', error)
+    }
+  }
+
+  // Handle adding to favorites
+  const handleAddToFavorites = async (media) => {
+    try {
+      if (!currentUser) {
+        console.log('User not logged in')
+        return
+      }
+
+      // Check if movie is already in favorites
+      const isInFavorites = userProfile?.favorites?.some(
+        (item) => item.id === media.id && item.type === media.type
+      )
+
+      if (isInFavorites) {
+        // Remove from favorites
+        console.log('Removing from favorites:', media)
+        await removeFromFavorites(media.id, media.type)
+        console.log('Successfully removed from favorites!')
+      } else {
+        // Add to favorites
+        console.log('Adding to favorites:', media)
+
+        // Format the media data for the addToFavorites function
+        const formattedMedia = {
+          id: media.id,
+          title: media.title,
+          poster_path: media.poster,
+          media_type: media.type,
+          vote_average: parseFloat(media.rating),
+          release_date: `${media.year}-01-01`,
+          overview: media.description,
+        }
+
+        // Call the Firestore function with the right parameters
+        await addToFavorites(
+          currentUser.uid,
+          media.id,
+          JSON.stringify(formattedMedia)
+        )
+        console.log('Successfully added to favorites!')
+      }
+    } catch (error) {
+      console.error('Error handling favorites:', error)
+    }
+  }
+
+  // Handle marking as watched
+  const handleMarkAsWatched = async (media) => {
+    try {
+      if (!currentUser) {
+        console.log('User not logged in')
+        return
+      }
+
+      // Check if movie is already in watched
+      const isWatched = userProfile?.watched?.some(
+        (item) => item.id === media.id && item.type === media.type
+      )
+
+      if (isWatched) {
+        // Remove from watched
+        console.log('Removing from watched:', media)
+        await removeFromWatched(media.id, media.type)
+        console.log('Successfully removed from watched!')
+      } else {
+        // Add to watched
+        console.log('Marking as watched:', media)
+
+        // Format the media data for the addToWatched function
+        const formattedMedia = {
+          id: media.id,
+          title: media.title,
+          poster_path: media.poster,
+          media_type: media.type,
+          vote_average: parseFloat(media.rating),
+          release_date: `${media.year}-01-01`,
+          overview: media.description,
+        }
+
+        // Call the Firestore function with the right parameters
+        await addToWatched(
+          currentUser.uid,
+          media.id,
+          JSON.stringify(formattedMedia)
+        )
+        console.log('Successfully marked as watched!')
+      }
+    } catch (error) {
+      console.error('Error handling watched status:', error)
     }
   }
 
@@ -388,9 +498,9 @@ function Home() {
                 {movie.description}
               </p>
 
+              {/* Actions */}
               <div
-                className="flex gap-3 mt-4"
-                key={`buttons-${movie.id}`}
+                className="flex items-center flex-wrap gap-3 mt-5 w-full"
                 style={{
                   animation: 'slideUp 800ms ease-out forwards',
                   animationDelay: '200ms',
@@ -399,34 +509,115 @@ function Home() {
               >
                 <Link
                   to={`/${movie.type}/${movie.id}`}
-                  className="primary-button flex items-center gap-1 cursor-pointer group"
+                  className="primary-button flex items-center gap-1 group"
                 >
                   <span className="transform transition-transform group-hover:scale-110">
                     ▶
                   </span>{' '}
-                  Watch
+                  Watch Now
                 </Link>
+
                 {currentUser && (
-                  <button
-                    onClick={() => handleAddToWatchlist(movie)}
-                    className="secondary-button cursor-pointer flex items-center gap-1 hover:bg-[#5ccfee20]"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                  <>
+                    <button
+                      onClick={() => handleAddToWatchlist(movie)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                        userProfile?.watchlist?.some(
+                          (item) =>
+                            item.id === movie.id && item.type === movie.type
+                        )
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-800 text-white'
+                      }`}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                      />
-                    </svg>
-                    Add to Watchlist
-                  </button>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      {userProfile?.watchlist?.some(
+                        (item) =>
+                          item.id === movie.id && item.type === movie.type
+                      )
+                        ? 'In Watchlist'
+                        : 'Add to Watchlist'}
+                    </button>
+
+                    <button
+                      onClick={() => handleMarkAsWatched(movie)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                        userProfile?.watched?.some(
+                          (item) =>
+                            item.id === movie.id && item.type === movie.type
+                        )
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-800 text-white'
+                      }`}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      {userProfile?.watched?.some(
+                        (item) =>
+                          item.id === movie.id && item.type === movie.type
+                      )
+                        ? 'Watched'
+                        : 'Mark as Watched'}
+                    </button>
+
+                    <button
+                      onClick={() => handleAddToFavorites(movie)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                        userProfile?.favorites?.some(
+                          (item) =>
+                            item.id === movie.id && item.type === movie.type
+                        )
+                          ? 'bg-red-600 text-white'
+                          : 'bg-gray-800 text-white'
+                      }`}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                        />
+                      </svg>
+                      {userProfile?.favorites?.some(
+                        (item) =>
+                          item.id === movie.id && item.type === movie.type
+                      )
+                        ? 'Favorited'
+                        : 'Add to Favorites'}
+                    </button>
+                  </>
                 )}
               </div>
 

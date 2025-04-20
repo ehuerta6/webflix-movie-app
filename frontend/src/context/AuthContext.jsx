@@ -32,6 +32,8 @@ export function AuthProvider({ children }) {
     removeFromWatchlist: removeWatchlistItem,
     addToFavorites: addFavoritesItem,
     removeFromFavorites: removeFavoritesItem,
+    addToWatched: addWatchedItem,
+    removeFromWatched: removeWatchedItem,
   } = useFireStore()
 
   // Login with email and password
@@ -211,6 +213,30 @@ export function AuthProvider({ children }) {
           console.error('Error fetching watchlist:', error)
         }
 
+        // Get watched movies
+        let watchedItems = []
+        try {
+          const watchedRef = collection(db, 'users', currentUser.uid, 'watched')
+          const watchedSnapshot = await getDocs(watchedRef)
+
+          watchedItems = watchedSnapshot.docs.map((doc) => {
+            const data = JSON.parse(doc.data().data || '{}')
+            return {
+              id: doc.id,
+              type: data.media_type,
+              title: data.title,
+              poster: data.poster_path,
+              rating: data.vote_average,
+              year: data.release_date ? data.release_date.split('-')[0] : 'N/A',
+              watchedAt: doc.data().watchedAt,
+            }
+          })
+
+          console.log('Fetched watched movies:', watchedItems.length)
+        } catch (error) {
+          console.error('Error fetching watched movies:', error)
+        }
+
         // Build the user profile with real data
         const userProfile = {
           uid: currentUser.uid,
@@ -223,6 +249,7 @@ export function AuthProvider({ children }) {
           favoriteGenres: userData.favoriteGenres || [],
           watchlist: watchlistItems,
           favorites: userData.favorites || [],
+          watched: watchedItems || [],
         }
 
         setUserProfile(userProfile)
@@ -446,6 +473,105 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Add to watched movies - using Firestore
+  const addToWatched = async (userId, mediaId, mediaData) => {
+    try {
+      if (!currentUser) throw new Error('No user is currently logged in')
+
+      // Parse the media data if it's a string
+      const media =
+        typeof mediaData === 'string' ? JSON.parse(mediaData) : mediaData
+
+      const mediaItem = {
+        id: media.id,
+        type: media.media_type || media.type,
+        title: media.title || media.name,
+        poster: media.poster_path
+          ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
+          : null,
+        backdrop: media.backdrop_path
+          ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`
+          : null,
+        rating: media.vote_average ? media.vote_average.toFixed(1) : '0.0',
+        year: media.release_date
+          ? media.release_date.split('-')[0]
+          : media.first_air_date
+          ? media.first_air_date.split('-')[0]
+          : 'N/A',
+      }
+
+      console.log('Adding to watched movies:', mediaItem)
+
+      // Add to Firestore first
+      await addWatchedItem(
+        currentUser.uid,
+        mediaItem.id,
+        JSON.stringify(mediaItem)
+      )
+
+      // Then update local state
+      setUserProfile((prev) => {
+        if (!prev) return null
+
+        const watched = prev.watched || []
+        // Check if item already exists
+        const existingItem = watched.find(
+          (item) => item.id === mediaItem.id && item.type === mediaItem.type
+        )
+
+        if (existingItem) {
+          console.log('Item already in watched movies')
+          return prev
+        }
+
+        // Add watched timestamp
+        mediaItem.watchedAt = new Date().toISOString()
+
+        return {
+          ...prev,
+          watched: [...watched, mediaItem],
+        }
+      })
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error adding to watched movies:', error)
+      throw error
+    }
+  }
+
+  // Remove from watched - using Firestore
+  const removeFromWatched = async (mediaId, mediaType) => {
+    try {
+      if (!currentUser) throw new Error('No user is currently logged in')
+
+      console.log('Removing from watched movies:', mediaId, mediaType)
+
+      // Remove from Firestore first
+      await removeWatchedItem(currentUser.uid, mediaId)
+
+      // Then update local state
+      setUserProfile((prev) => {
+        if (!prev) return null
+
+        const watched = prev.watched || []
+        const updatedWatched = watched.filter(
+          (item) => !(item.id === mediaId && item.type === mediaType)
+        )
+
+        return {
+          ...prev,
+          watched: updatedWatched,
+        }
+      })
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error removing from watched movies:', error)
+      throw error
+    }
+  }
+
   // Update favorite genres with Firestore integration
   const updateFavoriteGenres = async (genres) => {
     try {
@@ -512,6 +638,8 @@ export function AuthProvider({ children }) {
     removeFromWatchlist,
     addToFavorites,
     removeFromFavorites,
+    addToWatched,
+    removeFromWatched,
     updateFavoriteGenres,
   }
 

@@ -5,41 +5,78 @@ import { useAuth } from '../context/AuthContext'
 const MovieCard = memo(function MovieCard({ movie }) {
   const { id, type = 'movie', title, poster, rating, genre, year } = movie
   const [imageLoaded, setImageLoaded] = useState(false)
-  const { currentUser, addToWatchlist, addToFavorites } = useAuth()
+  const {
+    currentUser,
+    addToWatchlist,
+    addToFavorites,
+    addToWatched,
+    userProfile,
+    removeFromWatchlist,
+    removeFromFavorites,
+    removeFromWatched,
+  } = useAuth()
+
+  // Check if movie is in the user's collections
+  const isInWatchlist = userProfile?.watchlist?.some(
+    (item) => item.id === id && item.type === type
+  )
+
+  const isInFavorites = userProfile?.favorites?.some(
+    (item) => item.id === id && item.type === type
+  )
+
+  const isWatched = userProfile?.watched?.some(
+    (item) => item.id === id && item.type === type
+  )
 
   // Handle adding to watchlist
   const handleAddToWatchlist = async (e) => {
     e.preventDefault() // Prevent navigation
     e.stopPropagation() // Prevent event bubbling
 
-    console.log('Adding to watchlist:', movie)
     try {
-      if (addToWatchlist && currentUser) {
-        // Format movie data as needed for our updated addToWatchlist function
-        const mediaToAdd = {
-          id: id,
-          title: title,
-          poster_path: poster,
-          media_type: type,
-          vote_average: rating ? parseFloat(rating) : 0,
-          release_date: year ? `${year}-01-01` : null,
+      if (!currentUser) {
+        console.log('User not logged in')
+        return
+      }
+
+      if (isInWatchlist) {
+        // If already in watchlist, remove it
+        console.log('Removing from watchlist:', movie)
+
+        if (removeFromWatchlist) {
+          await removeFromWatchlist(id, type)
+          console.log('Successfully removed from watchlist!')
         }
-
-        // Call the Firestore function with the right parameters
-        await addToWatchlist(
-          currentUser.uid,
-          id, // media ID as second parameter
-          JSON.stringify(mediaToAdd) // stringified media object as third parameter
-        )
-
-        console.log('Successfully added to watchlist!')
       } else {
-        console.log(
-          'addToWatchlist function not found in AuthContext or user not logged in'
-        )
+        // Add to watchlist
+        console.log('Adding to watchlist:', movie)
+
+        if (addToWatchlist) {
+          // Format movie data as needed for our updated addToWatchlist function
+          const mediaToAdd = {
+            id: id,
+            title: title,
+            poster_path: poster,
+            media_type: type,
+            vote_average: rating ? parseFloat(rating) : 0,
+            release_date: year ? `${year}-01-01` : null,
+          }
+
+          // Call the Firestore function with the right parameters
+          await addToWatchlist(
+            currentUser.uid,
+            id, // media ID as second parameter
+            JSON.stringify(mediaToAdd) // stringified media object as third parameter
+          )
+
+          console.log('Successfully added to watchlist!')
+        } else {
+          console.log('addToWatchlist function not found in AuthContext')
+        }
       }
     } catch (error) {
-      console.error('Error adding to watchlist:', error)
+      console.error('Error handling watchlist:', error)
     }
   }
 
@@ -48,26 +85,89 @@ const MovieCard = memo(function MovieCard({ movie }) {
     e.preventDefault() // Prevent navigation
     e.stopPropagation() // Prevent event bubbling
 
-    console.log('Adding to liked movies:', movie)
     try {
-      if (addToFavorites) {
-        // Format movie data as needed for addToFavorites function
-        const mediaToAdd = {
-          id: id,
-          title: title,
-          poster_path: poster,
-          media_type: type,
-          vote_average: rating ? parseFloat(rating) : 0,
-          release_date: year ? `${year}-01-01` : null,
-        }
+      if (!currentUser) {
+        console.log('User not logged in')
+        return
+      }
 
-        await addToFavorites(mediaToAdd)
-        console.log('Successfully added to liked movies!')
+      if (isInFavorites) {
+        // If already in favorites, remove it
+        console.log('Removing from favorites:', movie)
+
+        if (removeFromFavorites) {
+          await removeFromFavorites(id, type)
+          console.log('Successfully removed from favorites!')
+        }
       } else {
-        console.log('addToFavorites function not found in AuthContext')
+        // Add to favorites
+        console.log('Adding to liked movies:', movie)
+
+        if (addToFavorites) {
+          // Format movie data as needed for addToFavorites function
+          const mediaToAdd = {
+            id: id,
+            title: title,
+            poster_path: poster,
+            media_type: type,
+            vote_average: rating ? parseFloat(rating) : 0,
+            release_date: year ? `${year}-01-01` : null,
+          }
+
+          await addToFavorites(mediaToAdd)
+          console.log('Successfully added to liked movies!')
+        } else {
+          console.log('addToFavorites function not found in AuthContext')
+        }
       }
     } catch (error) {
-      console.error('Error adding to liked movies:', error)
+      console.error('Error handling favorites:', error)
+    }
+  }
+
+  // Handle marking as watched
+  const handleMarkAsWatched = async (e) => {
+    e.preventDefault() // Prevent navigation
+    e.stopPropagation() // Prevent event bubbling
+
+    try {
+      if (!currentUser) {
+        console.log('User not logged in')
+        return
+      }
+
+      if (isWatched) {
+        // If already watched, remove it
+        console.log('Removing from watched:', movie)
+
+        if (removeFromWatched) {
+          await removeFromWatched(id, type)
+          console.log('Successfully removed from watched!')
+        }
+      } else {
+        // Add to watched
+        console.log('Marking as watched:', movie)
+
+        if (addToWatched) {
+          // Format movie data as needed for addToWatched function
+          const mediaToAdd = {
+            id: id,
+            title: title,
+            poster_path: poster,
+            media_type: type,
+            vote_average: rating ? parseFloat(rating) : 0,
+            release_date: year ? `${year}-01-01` : null,
+          }
+
+          // Call the Firestore function with the right parameters
+          await addToWatched(currentUser.uid, id, JSON.stringify(mediaToAdd))
+          console.log('Successfully marked as watched!')
+        } else {
+          console.log('addToWatched function not found in AuthContext')
+        }
+      }
+    } catch (error) {
+      console.error('Error handling watched status:', error)
     }
   }
 
@@ -126,13 +226,15 @@ const MovieCard = memo(function MovieCard({ movie }) {
           {/* Add to watchlist button */}
           <button
             onClick={handleAddToWatchlist}
-            className="p-1.5 bg-black/70 hover:bg-[#333] rounded-full text-white transition-colors"
-            title="Add to watchlist"
+            className={`p-1.5 ${
+              isInWatchlist ? 'bg-[#5ccfee]/80' : 'bg-black/70 hover:bg-[#333]'
+            } rounded-full text-white transition-colors`}
+            title={isInWatchlist ? 'In your watchlist' : 'Add to watchlist'}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-4 w-4"
-              fill="none"
+              fill={isInWatchlist ? 'currentColor' : 'none'}
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
@@ -148,13 +250,15 @@ const MovieCard = memo(function MovieCard({ movie }) {
           {/* Add to liked movies button */}
           <button
             onClick={handleAddToFavorites}
-            className="p-1.5 bg-black/70 hover:bg-[#333] rounded-full text-white transition-colors"
-            title="Add to liked movies"
+            className={`p-1.5 ${
+              isInFavorites ? 'bg-red-500/80' : 'bg-black/70 hover:bg-[#333]'
+            } rounded-full text-white transition-colors`}
+            title={isInFavorites ? 'In your favorites' : 'Add to liked movies'}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-4 w-4"
-              fill="none"
+              fill={isInFavorites ? 'currentColor' : 'none'}
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
@@ -163,6 +267,30 @@ const MovieCard = memo(function MovieCard({ movie }) {
                 strokeLinejoin="round"
                 strokeWidth={2}
                 d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+          </button>
+
+          {/* Mark as watched button */}
+          <button
+            onClick={handleMarkAsWatched}
+            className={`p-1.5 ${
+              isWatched ? 'bg-green-500/80' : 'bg-black/70 hover:bg-[#333]'
+            } rounded-full text-white transition-colors`}
+            title={isWatched ? 'Watched' : 'Mark as watched'}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill={isWatched ? 'currentColor' : 'none'}
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
               />
             </svg>
           </button>

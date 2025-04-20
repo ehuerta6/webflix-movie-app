@@ -13,17 +13,21 @@ function MediaActions({ media }) {
     removeFromWatchlist,
     addToFavorites,
     removeFromFavorites,
+    addToWatched,
+    removeFromWatched,
     fetchUserProfile,
   } = useAuth()
 
   const [isInWatchlist, setIsInWatchlist] = useState(false)
   const [isInFavorites, setIsInFavorites] = useState(false)
+  const [isWatched, setIsWatched] = useState(false)
   const [isLoading, setIsLoading] = useState({
     watchlist: false,
     favorites: false,
+    watched: false,
   })
 
-  // Check if the media is in the user's watchlist or favorites
+  // Check if the media is in the user's watchlist, favorites, or watched
   useEffect(() => {
     if (userProfile) {
       // Check watchlist
@@ -39,10 +43,18 @@ function MediaActions({ media }) {
           item.id === media.id && item.type === (media.media_type || media.type)
       )
       setIsInFavorites(!!favoritesItem)
+
+      // Check watched
+      const watchedItem = userProfile.watched?.find(
+        (item) =>
+          item.id === media.id && item.type === (media.media_type || media.type)
+      )
+      setIsWatched(!!watchedItem)
     } else {
       // Reset states if userProfile is null
       setIsInWatchlist(false)
       setIsInFavorites(false)
+      setIsWatched(false)
     }
   }, [userProfile, media])
 
@@ -139,6 +151,54 @@ function MediaActions({ media }) {
       console.error('Error updating favorites:', error)
     } finally {
       setIsLoading((prev) => ({ ...prev, favorites: false }))
+    }
+  }
+
+  // Handle watched toggle
+  const handleWatchedToggle = async () => {
+    if (!currentUser) return
+
+    setIsLoading((prev) => ({ ...prev, watched: true }))
+
+    try {
+      if (isWatched) {
+        // Format needed for removeFromWatched
+        const mediaId = media.id
+        const mediaType = media.media_type || media.type
+
+        console.log('Removing from watched movies:', { mediaId, mediaType })
+        await removeFromWatched(mediaId, mediaType)
+      } else {
+        // Format media data for addToWatched
+        const formattedMedia = {
+          id: media.id,
+          title: media.title || media.name,
+          poster_path: media.poster || media.poster_path,
+          media_type: media.media_type || media.type,
+          vote_average: media.rating
+            ? parseFloat(media.rating)
+            : media.vote_average || 0,
+          release_date: media.year
+            ? `${media.year}-01-01`
+            : media.release_date || media.first_air_date || null,
+          overview: media.description || media.overview || '',
+        }
+
+        console.log('Adding to watched movies:', formattedMedia)
+        // Add to watched movies
+        await addToWatched(
+          currentUser.uid,
+          formattedMedia.id,
+          JSON.stringify(formattedMedia)
+        )
+      }
+
+      // Refresh user profile data to get updated watched list
+      await fetchUserProfile()
+    } catch (error) {
+      console.error('Error updating watched movies:', error)
+    } finally {
+      setIsLoading((prev) => ({ ...prev, watched: false }))
     }
   }
 
@@ -267,6 +327,75 @@ function MediaActions({ media }) {
           </>
         )}
         {isInFavorites ? 'Favorited' : 'Add to Favorites'}
+      </button>
+
+      <button
+        onClick={handleWatchedToggle}
+        disabled={isLoading.watched}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+          isWatched
+            ? 'bg-[#5ccfee] text-black hover:bg-[#4ab3d3]'
+            : 'bg-[#252525] text-white hover:bg-[#333]'
+        }`}
+      >
+        {isLoading.watched ? (
+          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+        ) : (
+          <>
+            {isWatched ? (
+              /* Filled watched icon */
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            ) : (
+              /* Outline watched icon */
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3.055 11.881C3.207 6.956 7.043 3 12 3s8.793 3.956 8.945 8.881c.088.402.013.82-.208 1.155-.306.442-.12.928.244 1.406-.054 1.848z"
+                />
+              </svg>
+            )}
+          </>
+        )}
+        {isWatched ? 'Watched' : 'Add to Watched'}
       </button>
     </div>
   )

@@ -1,38 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fetchMovies, fetchGenres } from '../services/api'
+import { fetchGenres } from '../services/api'
 import { useAuth } from '../context/AuthContext'
-
-// Helper function to validate movie data
-const isValidMovie = (movie) => {
-  return (
-    movie &&
-    movie.id &&
-    (movie.title || movie.name) &&
-    movie.poster_path &&
-    movie.vote_average !== undefined
-  )
-}
-
-// Format movie data for consistent display
-const formatMovieData = (movie, genreMap = {}) => {
-  return {
-    id: movie.id,
-    title: movie.title || movie.name,
-    poster: movie.poster_path
-      ? `https://image.tmdb.org/t/p/w342${movie.poster_path}`
-      : 'https://via.placeholder.com/342x513?text=No+Image',
-    year:
-      movie.release_date || movie.first_air_date
-        ? new Date(movie.release_date || movie.first_air_date).getFullYear()
-        : 'Unknown',
-    rating: movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A',
-    genre:
-      movie.genre_ids && movie.genre_ids[0] && genreMap[movie.genre_ids[0]]
-        ? genreMap[movie.genre_ids[0]]
-        : null,
-  }
-}
 
 // MovieCard component for reuse in different collections
 const MovieCard = ({ movie, actions }) => {
@@ -112,6 +81,7 @@ function User() {
     removeFromWatchlist,
     removeFromFavorites,
     updateFavoriteGenres,
+    removeFromWatched,
   } = useAuth()
   const [userStats, setUserStats] = useState({
     movieCount: 0,
@@ -122,12 +92,12 @@ function User() {
   const [genreMap, setGenreMap] = useState({})
   const [likedMovies, setLikedMovies] = useState([])
   const [watchlistMovies, setWatchlistMovies] = useState([])
-  const [recommendedMovies, setRecommendedMovies] = useState([])
+  const [watchedMovies, setWatchedMovies] = useState([])
   const [loading, setLoading] = useState({
     genres: false,
     liked: false,
     watchlist: false,
-    recommendations: false,
+    watched: false,
     profile: false,
   })
 
@@ -211,7 +181,7 @@ function User() {
     if (currentUser?.uid) {
       fetchUserProfile()
     }
-  }, [currentUser?.uid]) // Only reload when the user ID changes
+  }, [currentUser?.uid, fetchUserProfile]) // Only reload when the user ID changes or fetchUserProfile changes
 
   // Load genre data for mapping IDs to names
   useEffect(() => {
@@ -310,81 +280,44 @@ function User() {
         setWatchlistMovies([])
         console.log('No watchlist items found in user profile')
       }
+
+      // Format watched movies data
+      if (userProfile.watched && userProfile.watched.length > 0) {
+        console.log(
+          'Processing watched movies from Firestore:',
+          userProfile.watched
+        )
+
+        const formattedWatched = userProfile.watched
+          .filter((item) => item.type === 'movie')
+          .map((movie) => {
+            // Extract image path from poster field
+            let posterPath = movie.poster
+            if (posterPath && !posterPath.startsWith('http')) {
+              posterPath = `https://image.tmdb.org/t/p/w342${posterPath}`
+            }
+
+            return {
+              id: movie.id,
+              title: movie.title,
+              poster:
+                posterPath ||
+                'https://via.placeholder.com/342x513?text=No+Image',
+              year: movie.year || 'N/A',
+              rating: movie.rating || 'N/A',
+              genre: movie.genres && movie.genres[0] ? movie.genres[0] : null,
+              watchedAt: movie.watchedAt || 'N/A',
+            }
+          })
+
+        setWatchedMovies(formattedWatched)
+        console.log('Formatted watched movies:', formattedWatched.length)
+      } else {
+        setWatchedMovies([])
+        console.log('No watched movies found in user profile')
+      }
     }
   }, [userProfile, genreMap])
-
-  // Fetch movie recommendations based on favorite genres
-  useEffect(() => {
-    const fetchRecommendations = async () => {
-      if (
-        !userProfile?.favoriteGenres?.length ||
-        !Object.keys(genreMap).length
-      ) {
-        // Clear recommendations if no favorite genres
-        setRecommendedMovies([])
-        return
-      }
-
-      setLoading((prev) => ({ ...prev, recommendations: true }))
-      try {
-        // Find genre IDs from names by mapping the reverse way
-        const genreIdMap = {}
-        Object.entries(genreMap).forEach(([id, name]) => {
-          genreIdMap[name] = id
-        })
-
-        // Get IDs of user's favorite genres
-        const genreIds = userProfile.favoriteGenres
-          .map((name) => genreIdMap[name])
-          .filter((id) => id) // Filter out any undefined IDs
-          .join(',')
-
-        if (!genreIds) {
-          setRecommendedMovies([])
-          return
-        }
-
-        // Fetch movies with these genres
-        const data = await fetchMovies(
-          { with_genres: genreIds, page: 1 },
-          1,
-          12
-        )
-
-        // Filter out any movies already in liked or watchlist to avoid duplicates
-        const likedMovieIds = new Set(
-          (userProfile.liked_movies || []).map((m) => m.id)
-        )
-        const watchlistMovieIds = new Set(
-          (userProfile.watchlist_movies || []).map((m) => m.id)
-        )
-
-        // Filter and format valid movies
-        const formattedMovies = data.results
-          .filter(isValidMovie)
-          .filter(
-            (movie) =>
-              !likedMovieIds.has(movie.id) && !watchlistMovieIds.has(movie.id)
-          )
-          .map((movie) => formatMovieData(movie, genreMap))
-          .slice(0, 8)
-
-        setRecommendedMovies(formattedMovies)
-      } catch (error) {
-        console.error('Error fetching recommendations:', error)
-        setRecommendedMovies([])
-      } finally {
-        setLoading((prev) => ({ ...prev, recommendations: false }))
-      }
-    }
-
-    fetchRecommendations()
-  }, [
-    genreMap,
-    userProfile?.favoriteGenres,
-    userProfile?.liked_movies,
-    userProfile?.watchlist_movies,
-  ])
 
   // Event handlers
   const handleGoBack = () => navigate(-1)
@@ -646,6 +579,21 @@ function User() {
     }
   }
 
+  // Handle removing an item from watched with controlled reload
+  const handleRemoveFromWatched = async (mediaId) => {
+    try {
+      setLoading((prev) => ({ ...prev, watched: true }))
+      await removeFromWatched(mediaId, 'movie')
+
+      // Update local state instead of reloading the entire profile
+      setWatchedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
+    } catch (error) {
+      console.error('Error removing from watched movies:', error)
+    } finally {
+      setLoading((prev) => ({ ...prev, watched: false }))
+    }
+  }
+
   // Movie collection actions
   const collectionActions = {
     liked: (movie) => (
@@ -730,21 +678,46 @@ function User() {
         </button>
       </>
     ),
-    recommendations: (movie) => (
-      <div className="flex space-x-1 w-full">
+    watched: (movie) => (
+      <>
         <button
-          className="flex-1 text-xs text-center py-0.5 rounded bg-[#1d1d1d] hover:bg-[#333] text-gray-300 text-[10px]"
+          className="text-[#5ccfee] hover:text-[#4ab3d3]"
+          aria-label="View details"
           onClick={() => navigate(`/movie/${movie.id}`)}
         >
-          + Watch
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+            <path
+              fillRule="evenodd"
+              d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+              clipRule="evenodd"
+            />
+          </svg>
         </button>
         <button
-          className="flex-1 text-xs text-center py-0.5 rounded bg-[#1d1d1d] hover:bg-[#333] text-gray-300 text-[10px]"
-          onClick={() => navigate(`/movie/${movie.id}`)}
+          className="text-gray-400 hover:text-gray-300"
+          aria-label="Remove from watched"
+          onClick={() => handleRemoveFromWatched(movie.id)}
         >
-          Like
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z"
+              clipRule="evenodd"
+            />
+          </svg>
         </button>
-      </div>
+      </>
     ),
   }
 
@@ -781,7 +754,9 @@ function User() {
       ) : (
         <div className="text-gray-400 text-sm py-4 text-center">
           {title === 'Recommended For You'
-            ? 'Select favorite genres to get recommendations'
+            ? userProfile?.favoriteGenres?.length > 0
+              ? 'No recommended movies found based on your genres. Try selecting different genres!'
+              : 'Select favorite genres in your profile to get recommendations'
             : `No ${title.toLowerCase()} found`}
         </div>
       )}
@@ -1259,29 +1234,38 @@ function User() {
           </div>
         ) : (
           <div className="max-w-5xl mx-auto space-y-4">
-            {/* Movie Collections */}
+            {/* Liked Movies Collection */}
             <div className="bg-[#1e1e1e] rounded-lg shadow-md overflow-hidden border border-[#2a2a2a]">
-              <div className="p-4 space-y-6">
+              <div className="p-4">
                 <MovieCollection
                   title="Liked Movies"
                   movies={likedMovies}
                   actions={collectionActions.liked}
                   isLoading={loading.liked}
                 />
+              </div>
+            </div>
 
+            {/* Watchlist Collection */}
+            <div className="bg-[#1e1e1e] rounded-lg shadow-md overflow-hidden border border-[#2a2a2a]">
+              <div className="p-4">
                 <MovieCollection
                   title="Watchlist"
                   movies={watchlistMovies}
                   actions={collectionActions.watchlist}
                   isLoading={loading.watchlist}
                 />
+              </div>
+            </div>
 
+            {/* Watched Movies Collection */}
+            <div className="bg-[#1e1e1e] rounded-lg shadow-md overflow-hidden border border-[#2a2a2a]">
+              <div className="p-4">
                 <MovieCollection
-                  title="Recommended For You"
-                  movies={recommendedMovies}
-                  actions={collectionActions.recommendations}
-                  isLoading={loading.recommendations}
-                  description="Based on your favorite genres"
+                  title="Watched Movies"
+                  movies={watchedMovies}
+                  actions={collectionActions.watched}
+                  isLoading={loading.watched}
                 />
               </div>
             </div>

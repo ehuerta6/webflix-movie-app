@@ -77,11 +77,48 @@ export const useFireStore = () => {
     }
   }
 
+  const addToWatched = async (userId, mediaId, mediaData) => {
+    try {
+      // Create a document reference with the mediaId as the document ID
+      const docRef = doc(db, 'users', userId, 'watched', mediaId.toString())
+
+      // Set the document data
+      await setDoc(docRef, {
+        data: mediaData,
+        watchedAt: new Date().toISOString(),
+      })
+
+      console.log('Added to watched movies in Firestore:', mediaId)
+      return true
+    } catch (error) {
+      console.error('Error adding to watched movies:', error)
+      throw error
+    }
+  }
+
+  const removeFromWatched = async (userId, mediaId) => {
+    try {
+      // Create a document reference with the mediaId
+      const docRef = doc(db, 'users', userId, 'watched', mediaId.toString())
+
+      // Delete the document
+      await deleteDoc(docRef)
+
+      console.log('Removed from watched movies in Firestore:', mediaId)
+      return true
+    } catch (error) {
+      console.error('Error removing from watched movies:', error)
+      throw error
+    }
+  }
+
   return {
     addDocument,
     addToWatchlist,
     removeFromWatchlist,
     addToFavorites,
     removeFromFavorites,
+    addToWatched,
+    removeFromWatched,
   }
 }
