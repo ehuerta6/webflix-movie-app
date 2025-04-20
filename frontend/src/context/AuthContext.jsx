@@ -269,7 +269,7 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Update user profile - placeholder for future implementation
+  // Update user profile with Firestore integration
   const updateUserProfile = async (profileData) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
@@ -281,8 +281,29 @@ export function AuthProvider({ children }) {
         })
       }
 
-      // Will implement Firestore update later
-      console.log('Will update profile in database:', profileData)
+      // Update Firestore user document
+      const userRef = doc(db, 'users', currentUser.uid)
+
+      // Get the current user document
+      const userSnapshot = await getDoc(userRef)
+      let userData = {}
+
+      if (userSnapshot.exists()) {
+        userData = userSnapshot.data()
+      }
+
+      // Prepare the updated data
+      const updatedData = {
+        ...userData,
+        displayName: profileData.displayName || userData.displayName,
+        username: profileData.username || userData.username,
+        bio: profileData.bio || userData.bio,
+        updatedAt: new Date().toISOString(),
+      }
+
+      // Update the document in Firestore
+      await setDoc(userRef, updatedData, { merge: true })
+      console.log('Updated user profile in Firestore:', currentUser.uid)
 
       // Update the local profile state with the new data
       setUserProfile((prev) => ({
@@ -425,14 +446,22 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Update favorite genres - placeholder implementation
+  // Update favorite genres with Firestore integration
   const updateFavoriteGenres = async (genres) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
 
-      console.log(
-        'Updating favorite genres (will implement database later):',
-        genres
+      console.log('Updating favorite genres in Firestore:', genres)
+
+      // Update the user document in Firestore
+      const userRef = doc(db, 'users', currentUser.uid)
+      await setDoc(
+        userRef,
+        {
+          favoriteGenres: genres,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
       )
 
       // Update local state

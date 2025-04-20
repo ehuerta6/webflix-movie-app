@@ -189,31 +189,29 @@ function User() {
 
   // Initialize form data when userProfile changes
   useEffect(() => {
-    if (userProfile) {
+    if (userProfile && isEditingProfile) {
       setEditForm({
         name: userProfile.displayName || '',
         username: userProfile.username || '',
         bio: userProfile.bio || '',
         selectedGenres: userProfile.favoriteGenres || [],
       })
+    }
 
+    if (userProfile) {
       setSettingsForm((prev) => ({
         ...prev,
         email: userProfile.email || '',
       }))
     }
-  }, [userProfile])
+  }, [userProfile, isEditingProfile])
 
-  // Refresh user profile on mount
+  // Fetch user profile on mount and when user changes
   useEffect(() => {
-    const loadUserProfile = async () => {
-      setLoading((prev) => ({ ...prev, profile: true }))
-      await fetchUserProfile()
-      setLoading((prev) => ({ ...prev, profile: false }))
+    if (currentUser?.uid) {
+      fetchUserProfile()
     }
-
-    loadUserProfile()
-  }, [fetchUserProfile])
+  }, [currentUser?.uid]) // Only reload when the user ID changes
 
   // Load genre data for mapping IDs to names
   useEffect(() => {
@@ -254,7 +252,7 @@ function User() {
     loadGenres()
   }, [])
 
-  // Load user watchlist and favorites from profile data
+  // Load user watchlist and favorites from profile data with improved Firestore compatibility
   useEffect(() => {
     if (userProfile && Object.keys(genreMap).length > 0) {
       // Format favorites data
@@ -278,24 +276,39 @@ function User() {
         setLikedMovies([])
       }
 
-      // Format watchlist data
+      // Format watchlist data with improved handling for Firestore data structure
       if (userProfile.watchlist && userProfile.watchlist.length > 0) {
+        console.log(
+          'Processing watchlist from Firestore:',
+          userProfile.watchlist
+        )
+
         const formattedWatchlist = userProfile.watchlist
           .filter((item) => item.type === 'movie')
-          .map((movie) => ({
-            id: movie.id,
-            title: movie.title,
-            poster:
-              movie.poster ||
-              'https://via.placeholder.com/342x513?text=No+Image',
-            year: movie.year || 'N/A',
-            rating: movie.rating || 'N/A',
-            genre: movie.genres && movie.genres[0] ? movie.genres[0] : null,
-          }))
+          .map((movie) => {
+            // Extract image path from poster field, sometimes it's a full URL, sometimes just a path
+            let posterPath = movie.poster
+            if (posterPath && !posterPath.startsWith('http')) {
+              posterPath = `https://image.tmdb.org/t/p/w342${posterPath}`
+            }
+
+            return {
+              id: movie.id,
+              title: movie.title,
+              poster:
+                posterPath ||
+                'https://via.placeholder.com/342x513?text=No+Image',
+              year: movie.year || 'N/A',
+              rating: movie.rating || 'N/A',
+              genre: movie.genres && movie.genres[0] ? movie.genres[0] : null,
+            }
+          })
 
         setWatchlistMovies(formattedWatchlist)
+        console.log('Formatted watchlist movies:', formattedWatchlist.length)
       } else {
         setWatchlistMovies([])
+        console.log('No watchlist items found in user profile')
       }
     }
   }, [userProfile, genreMap])
@@ -303,15 +316,27 @@ function User() {
   // Fetch movie recommendations based on favorite genres
   useEffect(() => {
     const fetchRecommendations = async () => {
-      if (!userProfile?.favoriteGenres?.length || !Object.keys(genreMap).length)
+      if (
+        !userProfile?.favoriteGenres?.length ||
+        !Object.keys(genreMap).length
+      ) {
+        // Clear recommendations if no favorite genres
+        setRecommendedMovies([])
         return
+      }
 
       setLoading((prev) => ({ ...prev, recommendations: true }))
       try {
-        // Look up genre IDs from genre names
-        const genreIds = Object.entries(genreMap)
-          .filter(([, name]) => userProfile.favoriteGenres.includes(name))
-          .map(([id]) => id)
+        // Find genre IDs from names by mapping the reverse way
+        const genreIdMap = {}
+        Object.entries(genreMap).forEach(([id, name]) => {
+          genreIdMap[name] = id
+        })
+
+        // Get IDs of user's favorite genres
+        const genreIds = userProfile.favoriteGenres
+          .map((name) => genreIdMap[name])
+          .filter((id) => id) // Filter out any undefined IDs
           .join(',')
 
         if (!genreIds) {
@@ -319,29 +344,53 @@ function User() {
           return
         }
 
-        const data = await fetchMovies({ with_genres: genreIds }, 1, 10)
+        // Fetch movies with these genres
+        const data = await fetchMovies(
+          { with_genres: genreIds, page: 1 },
+          1,
+          12
+        )
+
+        // Filter out any movies already in liked or watchlist to avoid duplicates
+        const likedMovieIds = new Set(
+          (userProfile.liked_movies || []).map((m) => m.id)
+        )
+        const watchlistMovieIds = new Set(
+          (userProfile.watchlist_movies || []).map((m) => m.id)
+        )
 
         // Filter and format valid movies
         const formattedMovies = data.results
           .filter(isValidMovie)
+          .filter(
+            (movie) =>
+              !likedMovieIds.has(movie.id) && !watchlistMovieIds.has(movie.id)
+          )
           .map((movie) => formatMovieData(movie, genreMap))
           .slice(0, 8)
 
         setRecommendedMovies(formattedMovies)
       } catch (error) {
         console.error('Error fetching recommendations:', error)
+        setRecommendedMovies([])
       } finally {
         setLoading((prev) => ({ ...prev, recommendations: false }))
       }
     }
 
     fetchRecommendations()
-  }, [genreMap, userProfile])
+  }, [
+    genreMap,
+    userProfile?.favoriteGenres,
+    userProfile?.liked_movies,
+    userProfile?.watchlist_movies,
+  ])
 
   // Event handlers
   const handleGoBack = () => navigate(-1)
 
   const handleProfileEdit = () => {
+    // Initialize the form with current userProfile data
     setEditForm({
       name: userProfile?.displayName || '',
       username: userProfile?.username || '',
@@ -349,6 +398,7 @@ function User() {
       selectedGenres: userProfile?.favoriteGenres || [],
     })
     setIsEditingProfile(true)
+    setProfileError('')
   }
 
   const handleEditFormChange = (e) => {
@@ -400,6 +450,8 @@ function User() {
         bio: editForm.bio,
       }
 
+      console.log('Updating user profile in Firestore:', profileData)
+
       // Update the user profile
       await updateUserProfile(profileData)
 
@@ -408,9 +460,20 @@ function User() {
         JSON.stringify(editForm.selectedGenres) !==
         JSON.stringify(userProfile?.favoriteGenres || [])
       ) {
+        console.log(
+          'Updating favorite genres in Firestore:',
+          editForm.selectedGenres
+        )
         await updateFavoriteGenres(editForm.selectedGenres)
       }
 
+      // Show success message or toast here if you have a UI component for it
+      console.log('Profile successfully updated')
+
+      // Reload the user profile once after updates are complete
+      await fetchUserProfile()
+
+      // Close the editing form
       setIsEditingProfile(false)
     } catch (error) {
       console.error('Error updating profile:', error)
@@ -553,23 +616,33 @@ function User() {
     }
   }
 
-  // Handle removing an item from favorites
-  const handleRemoveFromFavorites = async (mediaId) => {
+  // Handle removing an item from watchlist with controlled reload
+  const handleRemoveFromWatchlist = async (mediaId) => {
     try {
-      await removeFromFavorites(mediaId, 'movie')
-      // The userProfile will be updated via AuthContext, which will trigger the useEffect above
+      setLoading((prev) => ({ ...prev, watchlist: true }))
+      await removeFromWatchlist(mediaId, 'movie')
+
+      // Update local state instead of reloading the entire profile
+      setWatchlistMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
     } catch (error) {
-      console.error('Error removing from favorites:', error)
+      console.error('Error removing from watchlist:', error)
+    } finally {
+      setLoading((prev) => ({ ...prev, watchlist: false }))
     }
   }
 
-  // Handle removing an item from watchlist
-  const handleRemoveFromWatchlist = async (mediaId) => {
+  // Handle removing an item from favorites with controlled reload
+  const handleRemoveFromFavorites = async (mediaId) => {
     try {
-      await removeFromWatchlist(mediaId, 'movie')
-      // The userProfile will be updated via AuthContext, which will trigger the useEffect above
+      setLoading((prev) => ({ ...prev, liked: true }))
+      await removeFromFavorites(mediaId, 'movie')
+
+      // Update local state instead of reloading the entire profile
+      setLikedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
     } catch (error) {
-      console.error('Error removing from watchlist:', error)
+      console.error('Error removing from favorites:', error)
+    } finally {
+      setLoading((prev) => ({ ...prev, liked: false }))
     }
   }
 
@@ -598,6 +671,7 @@ function User() {
         <button
           className="text-[#5ccfee] hover:text-[#4ab3d3]"
           aria-label="View details"
+          onClick={() => navigate(`/movie/${movie.id}`)}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -620,7 +694,7 @@ function User() {
         <button
           className="text-[#5ccfee] hover:text-[#4ab3d3]"
           aria-label="View details"
-          onClick={() => handleRemoveFromWatchlist(movie.id)}
+          onClick={() => navigate(`/movie/${movie.id}`)}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -639,6 +713,7 @@ function User() {
         <button
           className="text-gray-400 hover:text-gray-300"
           aria-label="Remove from watchlist"
+          onClick={() => handleRemoveFromWatchlist(movie.id)}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
