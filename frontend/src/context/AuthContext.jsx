@@ -1,10 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import {
-  auth,
-  // Keep db import commented for future use
-  // eslint-disable-next-line no-unused-vars
-  db,
-} from '../firebase/firebase'
+import { auth, db } from '../services/firebase'
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -18,9 +13,8 @@ import {
   reauthenticateWithCredential,
   updateEmail,
 } from 'firebase/auth'
-// Keep Firestore imports commented for future use
-// eslint-disable-next-line no-unused-vars
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { useFireStore } from '../services/firestore'
 
 const AuthContext = createContext()
 const googleProvider = new GoogleAuthProvider()
@@ -33,6 +27,11 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const {
+    addToWatchlist: addToWatchlistFirestore,
+    removeFromWatchlist: removeFromWatchlistFirestore,
+    getWatchlist,
+  } = useFireStore()
 
   // Login with email and password
   const login = async (email, password) => {
@@ -57,8 +56,19 @@ export function AuthProvider({ children }) {
       // Update profile with display name
       await updateProfile(userCredential.user, { displayName })
 
-      // Will implement Firestore later
-      console.log('Creating user document for:', userCredential.user.uid)
+      // Create user document in Firestore
+      try {
+        // Create an empty user document
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          uid: userCredential.user.uid,
+          displayName,
+          email,
+          createdAt: new Date().toISOString(),
+        })
+        console.log('Created user document for:', userCredential.user.uid)
+      } catch (error) {
+        console.error('Error creating user document:', error)
+      }
 
       return userCredential
     } catch (error) {
@@ -72,8 +82,23 @@ export function AuthProvider({ children }) {
     try {
       const result = await signInWithPopup(auth, googleProvider)
 
-      // Will implement Firestore check later
-      console.log('Google sign-in successful for user:', result.user.uid)
+      // Check if user document exists, if not create it
+      try {
+        const userDoc = await getDoc(doc(db, 'users', result.user.uid))
+
+        if (!userDoc.exists()) {
+          // Create user document in Firestore
+          await setDoc(doc(db, 'users', result.user.uid), {
+            uid: result.user.uid,
+            displayName: result.user.displayName,
+            email: result.user.email,
+            createdAt: new Date().toISOString(),
+          })
+          console.log('Created user document for Google user:', result.user.uid)
+        }
+      } catch (error) {
+        console.error('Error checking/creating user document:', error)
+      }
 
       return result
     } catch (error) {
@@ -144,12 +169,12 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Fetch user profile - placeholder for future Firestore implementation
+  // Fetch user profile - now fetches watchlist from Firestore
   const fetchUserProfile = async () => {
     if (!currentUser) return null
 
     try {
-      // Mock user profile data for now
+      // Mock user profile data for most fields
       const mockUserProfile = {
         uid: currentUser.uid,
         displayName: currentUser.displayName || 'Webflix User',
@@ -157,12 +182,18 @@ export function AuthProvider({ children }) {
         email: currentUser.email,
         bio: 'Movie enthusiast and aspiring critic.',
         favoriteGenres: [],
-        watchlist: [],
         favorites: [],
       }
 
+      // Fetch actual watchlist from Firestore
+      const watchlist = await getWatchlist(currentUser.uid)
+      mockUserProfile.watchlist = watchlist || []
+
       setUserProfile(mockUserProfile)
-      console.log('Fetched user profile (mock):', currentUser.uid)
+      console.log(
+        'Fetched user profile with watchlist from Firestore:',
+        currentUser.uid
+      )
       return mockUserProfile
     } catch (error) {
       console.error('Error fetching user profile:', error)
@@ -198,7 +229,7 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Add to watchlist - placeholder implementation
+  // Add to watchlist - now uses Firestore
   const addToWatchlist = async (media) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
@@ -219,12 +250,13 @@ export function AuthProvider({ children }) {
           : media.first_air_date
           ? media.first_air_date.split('-')[0]
           : 'N/A',
+        added_at: new Date().toISOString(),
       }
 
-      console.log(
-        'Adding to watchlist (will implement database later):',
-        mediaItem
-      )
+      console.log('Adding to watchlist in Firestore:', mediaItem)
+
+      // Save to Firestore
+      await addToWatchlistFirestore(currentUser.uid, mediaItem)
 
       // Update local state
       setUserProfile((prev) => {
@@ -254,16 +286,15 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Remove from watchlist - placeholder implementation
+  // Remove from watchlist - now uses Firestore
   const removeFromWatchlist = async (mediaId, mediaType) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
 
-      console.log(
-        'Removing from watchlist (will implement database later):',
-        mediaId,
-        mediaType
-      )
+      console.log('Removing from watchlist in Firestore:', mediaId, mediaType)
+
+      // Remove from Firestore
+      await removeFromWatchlistFirestore(currentUser.uid, mediaId)
 
       // Update local state
       setUserProfile((prev) => {

@@ -176,7 +176,7 @@ function Details() {
   const [posterLoaded, setPosterLoaded] = useState(false)
 
   // Handle adding to watchlist
-  const handleAddToWatchlist = async (media) => {
+  const handleSaveToWatchlist = async (media) => {
     console.log('Adding to watchlist:', media)
     try {
       if (addToWatchlist) {
@@ -536,7 +536,7 @@ function Details() {
                 {/* Custom add to watchlist button for testing */}
                 <button
                   onClick={() =>
-                    handleAddToWatchlist({
+                    handleSaveToWatchlist({
                       id: details.id,
                       title: details.title,
                       poster_path: details.poster,
