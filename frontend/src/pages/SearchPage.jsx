@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   searchTMDB,
@@ -18,7 +18,7 @@ function SearchPage() {
   const queryParams = new URLSearchParams(location.search)
   const searchQuery = queryParams.get('q') || ''
   const [searchInput, setSearchInput] = useState(searchQuery)
-  const { currentUser } = useAuth()
+  const { currentUser, addToWatchlist } = useAuth()
 
   const [searchResults, setSearchResults] = useState([])
   const [popularMovies, setPopularMovies] = useState([])
@@ -313,11 +313,39 @@ function SearchPage() {
   // Display either search results or popular content
   const displayedContent = searchQuery ? searchResults : popularMovies
 
+  // Handle adding to watchlist
+  const handleAddToWatchlist = async (media) => {
+    try {
+      if (!addToWatchlist) {
+        console.log('addToWatchlist function not found in AuthContext')
+        return
+      }
+
+      // Format the media data for the addToWatchlist function
+      const formattedMedia = {
+        id: media.id,
+        title: media.title,
+        poster_path: media.poster,
+        media_type: media.type,
+        vote_average: parseFloat(media.rating),
+        release_date: `${media.year}-01-01`,
+        overview: media.description,
+      }
+
+      console.log('Adding to watchlist:', formattedMedia)
+      await addToWatchlist(formattedMedia)
+      console.log('Successfully added to watchlist!')
+    } catch (error) {
+      console.error('Error adding to watchlist:', error)
+    }
+  }
+
   // Featured component for the hero section
   const Featured = ({ movie }) => {
-    if (!movie || !movie.backdrop) return null
-
     const [backdropLoaded, setBackdropLoaded] = useState(false)
+
+    // Return early if movie is invalid, but after useState calls
+    if (!movie || !movie.backdrop) return null
 
     // Function to go to the next item
     const goToNext = (e) => {
@@ -465,7 +493,10 @@ function SearchPage() {
                   Watch
                 </Link>
                 {currentUser && (
-                  <button className="inline-block bg-transparent border border-white text-white px-5 py-2 rounded hover:bg-[#5ccfee20] transition-colors flex items-center gap-1">
+                  <button
+                    onClick={() => handleAddToWatchlist(movie)}
+                    className="inline-block bg-transparent border border-white text-white px-5 py-2 rounded hover:bg-[#5ccfee20] transition-colors flex items-center gap-1"
+                  >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className="h-4 w-4"
@@ -477,10 +508,10 @@ function SearchPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M12 4v16m8-8H4"
+                        d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
                       />
                     </svg>
-                    Add to List
+                    Add to Watchlist
                   </button>
                 )}
               </div>
