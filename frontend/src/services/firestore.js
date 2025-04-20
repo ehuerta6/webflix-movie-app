@@ -1,5 +1,5 @@
 import { db } from '../services/firebase'
-import { addDoc, setDoc, doc, collection } from 'firebase/firestore'
+import { addDoc, collection } from 'firebase/firestore'
 
 export const useFireStore = () => {
   const addDocument = async (collectionName, data) => {
@@ -9,11 +9,12 @@ export const useFireStore = () => {
 
   const addToWatchlist = async (userId, mediaId, mediaData) => {
     try {
-      // Create a document reference with the mediaId as the document ID
-      const docRef = doc(db, 'users', userId, 'watchlist', mediaId.toString())
+      // First, create a reference to the user's watchlist collection
+      const watchlistCollection = collection(db, 'users', userId, 'watchlist')
 
-      // Set the document data
-      await setDoc(docRef, {
+      // Then create a document in that collection
+      await addDoc(watchlistCollection, {
+        mediaId: mediaId.toString(),
         data: mediaData,
         addedAt: new Date().toISOString(),
       })

@@ -236,20 +236,17 @@ function SearchPage() {
   }
 
   const performSearch = async () => {
-    if (!searchQuery && !isGenreSearch) {
-      setSearchResults([])
-      return
-    }
+    if (!searchQuery || searchQuery.trim() === '') return
 
     setLoading(true)
+    setError(null)
+
     try {
       let results = []
       let totalPgs = 0
       let totalRes = 0
 
       // Determine the type of search based on active tab
-      let searchType = activeTab === 'all' ? 'multi' : activeTab
-
       if (isGenreSearch) {
         // Genre search
         const genreId = searchQuery.split('-')[1]
@@ -316,8 +313,10 @@ function SearchPage() {
   // Handle adding to watchlist
   const handleAddToWatchlist = async (media) => {
     try {
-      if (!addToWatchlist) {
-        console.log('addToWatchlist function not found in AuthContext')
+      if (!addToWatchlist || !currentUser) {
+        console.log(
+          'addToWatchlist function not found in AuthContext or user not logged in'
+        )
         return
       }
 
@@ -333,7 +332,14 @@ function SearchPage() {
       }
 
       console.log('Adding to watchlist:', formattedMedia)
-      await addToWatchlist(formattedMedia)
+
+      // Call the Firestore function with the right parameters
+      await addToWatchlist(
+        currentUser.uid,
+        media.id,
+        JSON.stringify(formattedMedia)
+      )
+
       console.log('Successfully added to watchlist!')
     } catch (error) {
       console.error('Error adding to watchlist:', error)

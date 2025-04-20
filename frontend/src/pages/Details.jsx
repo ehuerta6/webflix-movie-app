@@ -164,7 +164,7 @@ const CastCard = ({ person }) => {
 function Details() {
   const { id, type } = useParams()
   const navigate = useNavigate()
-  const { addToWatchlist } = useAuth()
+  const { addToWatchlist, currentUser } = useAuth()
   const [details, setDetails] = useState(null)
   const [similarContent, setSimilarContent] = useState([])
   const [cast, setCast] = useState([])
@@ -179,11 +179,30 @@ function Details() {
   const handleSaveToWatchlist = async (media) => {
     console.log('Adding to watchlist:', media)
     try {
-      if (addToWatchlist) {
-        await addToWatchlist(media)
+      if (addToWatchlist && currentUser) {
+        // Format the media data
+        const mediaData = {
+          id: media.id,
+          title: media.title,
+          poster_path: media.poster_path,
+          media_type: media.media_type,
+          vote_average: media.vote_average,
+          release_date: media.release_date,
+          overview: media.overview,
+        }
+
+        // Call the Firestore function with the right parameters
+        await addToWatchlist(
+          currentUser.uid,
+          media.id,
+          JSON.stringify(mediaData)
+        )
+
         console.log('Successfully added to watchlist!')
       } else {
-        console.log('addToWatchlist function not found in AuthContext')
+        console.log(
+          'addToWatchlist function not found in AuthContext or user not logged in'
+        )
       }
     } catch (error) {
       console.error('Error adding to watchlist:', error)

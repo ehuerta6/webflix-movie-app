@@ -147,8 +147,10 @@ function Home() {
   // Handle adding to watchlist
   const handleAddToWatchlist = async (media) => {
     try {
-      if (!addToWatchlist) {
-        console.log('addToWatchlist function not found in AuthContext')
+      if (!addToWatchlist || !currentUser) {
+        console.log(
+          'addToWatchlist function not found in AuthContext or user not logged in'
+        )
         return
       }
 
@@ -164,7 +166,14 @@ function Home() {
       }
 
       console.log('Adding to watchlist:', formattedMedia)
-      await addToWatchlist(formattedMedia)
+
+      // Call the Firestore function with the right parameters
+      await addToWatchlist(
+        currentUser.uid,
+        media.id,
+        JSON.stringify(formattedMedia)
+      )
+
       console.log('Successfully added to watchlist!')
     } catch (error) {
       console.error('Error adding to watchlist:', error)
