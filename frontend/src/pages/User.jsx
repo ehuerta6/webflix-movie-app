@@ -108,7 +108,6 @@ function User() {
     removeFromFavorites,
     updateFavoriteGenres,
     removeFromWatched,
-    setUserProfile,
   } = useAuth()
   const [userStats, setUserStats] = useState({
     totalWatched: 0,
@@ -772,18 +771,6 @@ function User() {
         await updateFavoriteGenres(newGenres)
       }
 
-      // Update local userProfile to reflect the changes immediately
-      setUserProfile((prev) => ({
-        ...prev,
-        displayName: editForm.name,
-        username: editForm.username,
-        bio: editForm.bio,
-        profileColor: profileColor,
-        bannerColor: bannerColor,
-        rawProfileColor: rawProfileColor,
-        rawBannerColor: rawBannerColor,
-      }))
-
       // Success! Close the editing form
       setIsEditingProfile(false)
 
@@ -940,14 +927,8 @@ function User() {
       setLoading((prev) => ({ ...prev, watchlist: true }))
       await removeFromWatchlist(mediaId, 'movie')
 
-      // Update local state instead of reloading the entire profile
+      // Update local state without modifying userProfile directly
       setWatchlistMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
-
-      // Also update the userProfile state to keep it in sync
-      setUserProfile((prev) => ({
-        ...prev,
-        watchlist: (prev.watchlist || []).filter((item) => item.id !== mediaId),
-      }))
     } catch (error) {
       console.error('Error removing from watchlist:', error)
     } finally {
@@ -961,15 +942,8 @@ function User() {
       setLoading((prev) => ({ ...prev, liked: true }))
       await removeFromFavorites(mediaId, 'movie')
 
-      // Update local state instead of reloading the entire profile
-      // setLikedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
+      // Update local state without modifying userProfile directly
       setFavoritesMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
-
-      // Also update the userProfile state to keep it in sync
-      setUserProfile((prev) => ({
-        ...prev,
-        favorites: (prev.favorites || []).filter((item) => item.id !== mediaId),
-      }))
     } catch (error) {
       console.error('Error removing from favorites:', error)
     } finally {
@@ -983,15 +957,8 @@ function User() {
       setLoading((prev) => ({ ...prev, watched: true }))
       await removeFromWatched(mediaId, 'movie')
 
-      // Update local state instead of reloading the entire profile
-      // setWatchedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
+      // Update local state without modifying userProfile directly
       setWatchedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
-
-      // Also update the userProfile state to keep it in sync
-      setUserProfile((prev) => ({
-        ...prev,
-        watched: (prev.watched || []).filter((item) => item.id !== mediaId),
-      }))
     } catch (error) {
       console.error('Error removing from watched movies:', error)
     } finally {
@@ -1003,24 +970,6 @@ function User() {
   const collectionActions = {
     liked: (movie) => (
       <>
-        <button
-          className="text-red-500 hover:text-red-400"
-          aria-label="Unlike"
-          onClick={() => handleRemoveFromFavorites(movie.id)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
         <button
           className="text-[#5ccfee] hover:text-[#4ab3d3]"
           aria-label="View details"
@@ -1036,6 +985,24 @@ function User() {
             <path
               fillRule="evenodd"
               d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
+        <button
+          className="text-red-500 hover:text-red-400"
+          aria-label="Unlike"
+          onClick={() => handleRemoveFromFavorites(movie.id)}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
               clipRule="evenodd"
             />
           </svg>
