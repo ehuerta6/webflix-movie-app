@@ -28,7 +28,7 @@ export function AuthProvider({ children }) {
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const {
-    addToWatchlist,
+    addToWatchlist: addWatchlistItem,
     removeFromWatchlist: removeWatchlistItem,
     addToFavorites: addFavoritesItem,
     removeFromFavorites: removeFavoritesItem,
@@ -468,7 +468,122 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Add to favorites - using Firestore
+  // Add to watchlist - using Firestore
+  const addToWatchlist = async (userId, mediaId, mediaData) => {
+    try {
+      if (!currentUser) throw new Error('No user is currently logged in')
+
+      // Parse the media data if it's a string
+      const media =
+        typeof mediaData === 'string' ? JSON.parse(mediaData) : mediaData
+
+      // Format genre information if available
+      let genreNames = []
+      if (media.genres && Array.isArray(media.genres)) {
+        // Direct genre objects from API
+        genreNames = media.genres.map((g) => g.name)
+      } else if (media.genre_ids && Array.isArray(media.genre_ids)) {
+        // Just genre IDs - use common genre map
+        const genreMap = {
+          28: 'Action',
+          12: 'Adventure',
+          16: 'Animation',
+          35: 'Comedy',
+          80: 'Crime',
+          99: 'Documentary',
+          18: 'Drama',
+          10751: 'Family',
+          14: 'Fantasy',
+          36: 'History',
+          27: 'Horror',
+          10402: 'Music',
+          9648: 'Mystery',
+          10749: 'Romance',
+          878: 'Science Fiction',
+          10770: 'TV Movie',
+          53: 'Thriller',
+          10752: 'War',
+          37: 'Western',
+          10759: 'Action & Adventure',
+          10762: 'Kids',
+          10763: 'News',
+          10764: 'Reality',
+          10765: 'Sci-Fi & Fantasy',
+          10766: 'Soap',
+          10767: 'Talk',
+          10768: 'War & Politics',
+        }
+        genreNames = media.genre_ids
+          .map((id) => genreMap[id] || 'Unknown')
+          .filter((name) => name !== 'Unknown')
+      }
+
+      const mediaItem = {
+        id: media.id,
+        type: media.media_type || media.type || 'movie',
+        title: media.title || media.name || 'Unknown Title',
+        poster_path: media.poster_path,
+        poster: media.poster_path
+          ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
+          : null,
+        backdrop_path: media.backdrop_path,
+        backdrop: media.backdrop_path
+          ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`
+          : null,
+        vote_average: media.vote_average,
+        rating: media.vote_average ? media.vote_average.toFixed(1) : '0.0',
+        release_date: media.release_date || media.first_air_date,
+        year: media.release_date
+          ? media.release_date.split('-')[0]
+          : media.first_air_date
+          ? media.first_air_date.split('-')[0]
+          : 'N/A',
+        genres: genreNames,
+        genre: genreNames.length > 0 ? genreNames[0] : undefined,
+        overview: media.overview || '',
+      }
+
+      console.log('Adding to watchlist:', mediaItem)
+
+      // Add to Firestore first
+      await addWatchlistItem(
+        currentUser.uid,
+        mediaItem.id,
+        JSON.stringify(mediaItem)
+      )
+
+      // Then update local state
+      setUserProfile((prev) => {
+        if (!prev) return null
+
+        const watchlist = prev.watchlist || []
+        // Check if item already exists
+        const existingItem = watchlist.find(
+          (item) => item.id === mediaItem.id && item.type === mediaItem.type
+        )
+
+        if (existingItem) {
+          console.log('Item already in watchlist')
+          return prev
+        }
+
+        // Add timestamp
+        mediaItem.addedAt = new Date().toISOString()
+
+        return {
+          ...prev,
+          watchlist: [...watchlist, mediaItem],
+        }
+      })
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error adding to watchlist:', error)
+      throw error
+    }
+  }
+
+  // Add to favorites list - using Firestore
   const addToFavorites = async (userId, mediaId, mediaData) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
@@ -539,7 +654,7 @@ export function AuthProvider({ children }) {
           ? media.first_air_date.split('-')[0]
           : 'N/A',
         genres: genreNames,
-        genre: genreNames.length > 0 ? genreNames[0] : 'Drama',
+        genre: genreNames.length > 0 ? genreNames[0] : undefined,
         overview: media.overview || '',
       }
 
@@ -563,7 +678,7 @@ export function AuthProvider({ children }) {
         )
 
         if (existingItem) {
-          console.log('Item already in favorites')
+          console.log('Item already in favorites list')
           return prev
         }
 
@@ -615,7 +730,7 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Add to watched movies - using Firestore
+  // Add to watched list - using Firestore
   const addToWatched = async (userId, mediaId, mediaData) => {
     try {
       if (!currentUser) throw new Error('No user is currently logged in')
@@ -686,11 +801,11 @@ export function AuthProvider({ children }) {
           ? media.first_air_date.split('-')[0]
           : 'N/A',
         genres: genreNames,
-        genre: genreNames.length > 0 ? genreNames[0] : 'Drama',
+        genre: genreNames.length > 0 ? genreNames[0] : undefined,
         overview: media.overview || '',
       }
 
-      console.log('Adding to watched movies:', mediaItem)
+      console.log('Adding to watched:', mediaItem)
 
       // Add to Firestore first
       await addWatchedItem(
@@ -710,12 +825,12 @@ export function AuthProvider({ children }) {
         )
 
         if (existingItem) {
-          console.log('Item already in watched movies')
+          console.log('Item already in watched list')
           return prev
         }
 
-        // Add watched timestamp
-        mediaItem.watchedAt = new Date().toISOString()
+        // Add timestamp
+        mediaItem.addedAt = new Date().toISOString()
 
         return {
           ...prev,
@@ -725,7 +840,7 @@ export function AuthProvider({ children }) {
 
       return { success: true }
     } catch (error) {
-      console.error('Error adding to watched movies:', error)
+      console.error('Error adding to watched:', error)
       throw error
     }
   }

@@ -54,12 +54,22 @@ export const useFireStore = () => {
 
   const addToFavorites = async (userId, mediaId, mediaData) => {
     try {
+      // Parse media data if it's a string
+      const media =
+        typeof mediaData === 'string' ? JSON.parse(mediaData) : mediaData
+
+      // Ensure we have a valid mediaId
+      if (!mediaId) {
+        console.error('Invalid media ID')
+        return false
+      }
+
       // Create a document reference with the mediaId as the document ID
       const docRef = doc(db, 'users', userId, 'favorites', mediaId.toString())
 
-      // Set the document data
+      // Set the document data with standardized format
       await setDoc(docRef, {
-        data: mediaData,
+        data: typeof mediaData === 'string' ? mediaData : JSON.stringify(media),
         addedAt: new Date().toISOString(),
       })
 
@@ -89,12 +99,22 @@ export const useFireStore = () => {
 
   const addToWatched = async (userId, mediaId, mediaData) => {
     try {
+      // Parse media data if it's a string
+      const media =
+        typeof mediaData === 'string' ? JSON.parse(mediaData) : mediaData
+
+      // Ensure we have a valid mediaId
+      if (!mediaId) {
+        console.error('Invalid media ID')
+        return false
+      }
+
       // Create a document reference with the mediaId as the document ID
       const docRef = doc(db, 'users', userId, 'watched', mediaId.toString())
 
-      // Set the document data
+      // Set the document data with standardized format
       await setDoc(docRef, {
-        data: mediaData,
+        data: typeof mediaData === 'string' ? mediaData : JSON.stringify(media),
         watchedAt: new Date().toISOString(),
       })
 

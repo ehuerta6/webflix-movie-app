@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { searchTMDB } from '../services/api'
+import { searchMedia } from '../services/api'
 
 function SearchBar({ isOpen, onClose }) {
   const [searchQuery, setSearchQuery] = useState('')
@@ -64,7 +64,7 @@ function SearchBar({ isOpen, onClose }) {
     const fetchResults = async () => {
       setIsLoading(true)
       try {
-        const data = await searchTMDB(debouncedQuery)
+        const data = await searchMedia(debouncedQuery, 'multi', 1)
 
         // Organize results by type
         const movies = []
@@ -227,7 +227,9 @@ function SearchBar({ isOpen, onClose }) {
         {hasResults && (
           <div className="p-4 border-t border-[#2a2a2a]">
             <Link
-              to={`/search?query=${encodeURIComponent(debouncedQuery)}`}
+              to={`/search?q=${encodeURIComponent(
+                debouncedQuery
+              )}&page=1&tab=all`}
               className="block w-full py-2 px-4 bg-[#5ccfee] text-black font-medium rounded text-center hover:bg-[#4abfe0] transition-colors"
               onClick={onClose}
             >

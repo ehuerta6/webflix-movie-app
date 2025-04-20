@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
-  searchTMDB,
+  searchMedia,
   fetchGenres,
   searchByGenre,
   fetchMovies,
@@ -12,12 +12,31 @@ import Pagination from '../components/Pagination'
 import MovieCard from '../components/MovieCard'
 import FeaturedMovie from '../components/FeaturedMovie'
 
+// Debounce helper for search input
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
 function SearchPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const queryParams = new URLSearchParams(location.search)
   const searchQuery = queryParams.get('q') || ''
   const [searchInput, setSearchInput] = useState(searchQuery)
+  // Debounce the search input to avoid unnecessary renders
+  const debouncedSearchInput = useDebounce(searchInput, 300)
 
   const [searchResults, setSearchResults] = useState([])
   const [popularMovies, setPopularMovies] = useState([])
@@ -29,7 +48,9 @@ function SearchPage() {
   const [genreList, setGenreList] = useState([])
 
   // Pagination states
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useState(
+    parseInt(queryParams.get('page')) || 1
+  )
   const [totalPages, setTotalPages] = useState(0)
   const [totalResults, setTotalResults] = useState(0)
   const ITEMS_PER_PAGE = 20
@@ -39,6 +60,36 @@ function SearchPage() {
   const [featuredItems, setFeaturedItems] = useState([])
   const [currentFeaturedIndex, setCurrentFeaturedIndex] = useState(0)
   const carouselTimerRef = useRef(null)
+
+  // Listen for URL parameter changes
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const pageParam = parseInt(params.get('page')) || 1
+    const queryParam = params.get('q') || ''
+    const tabParam = params.get('tab') || 'all'
+
+    // Skip updating searchInput if the only difference is empty vs undefined
+    // This prevents the input from being cleared when a user is typing
+    const shouldUpdateSearchInput =
+      (queryParam && queryParam !== searchInput) ||
+      (!queryParam &&
+        searchInput &&
+        !document.activeElement?.matches('input[type="text"]'))
+
+    if (shouldUpdateSearchInput) {
+      setSearchInput(queryParam)
+    }
+
+    // Update current page if URL page changes
+    if (pageParam !== currentPage) {
+      setCurrentPage(pageParam)
+    }
+
+    // Update active tab if URL tab changes
+    if (tabParam !== activeTab) {
+      setActiveTab(tabParam)
+    }
+  }, [location.search, currentPage, activeTab])
 
   // Helper function to validate if content has required information
   const isValidContent = useCallback((item) => {
@@ -77,32 +128,54 @@ function SearchPage() {
   }, [])
 
   // Format movie data for consistent display
-  const formatMovieData = (movie) => ({
-    id: movie.id,
-    type: movie.media_type || (movie.first_air_date ? 'tv' : 'movie'),
-    title: movie.title || movie.name,
-    poster: movie.poster_path
-      ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-      : null,
-    backdrop: movie.backdrop_path
-      ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
-      : null,
-    rating: movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A',
-    genre:
-      movie.genre_ids && movie.genre_ids.length > 0
-        ? genreMap[movie.genre_ids[0]] || 'Unknown'
-        : 'Unknown',
-    year:
-      movie.release_date || movie.first_air_date
-        ? (movie.release_date || movie.first_air_date).substring(0, 4)
-        : 'Unknown',
-    description: movie.overview,
-    genres: movie.genre_ids
-      ? movie.genre_ids
-          .map((id) => genreMap[id] || 'Unknown')
-          .filter((name) => name !== 'Unknown')
-      : [],
-  })
+  const formatMovieData = (movie) => {
+    // Create a better genre mapping with more fallbacks
+    let genre = 'Unknown'
+    if (movie.genre_ids && movie.genre_ids.length > 0) {
+      genre = genreMap[movie.genre_ids[0]] || 'Unknown'
+    } else if (
+      movie.genres &&
+      Array.isArray(movie.genres) &&
+      movie.genres.length > 0
+    ) {
+      // Some API responses include full genre objects directly
+      if (typeof movie.genres[0] === 'object' && movie.genres[0].name) {
+        genre = movie.genres[0].name
+      } else if (typeof movie.genres[0] === 'string') {
+        genre = movie.genres[0]
+      }
+    }
+
+    // If still unknown, use the type at minimum
+    if (genre === 'Unknown') {
+      const type = movie.media_type || (movie.first_air_date ? 'tv' : 'movie')
+      genre = type === 'tv' ? 'TV Show' : 'Movie'
+    }
+
+    return {
+      id: movie.id,
+      type: movie.media_type || (movie.first_air_date ? 'tv' : 'movie'),
+      title: movie.title || movie.name,
+      poster: movie.poster_path
+        ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+        : null,
+      backdrop: movie.backdrop_path
+        ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
+        : null,
+      rating: movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A',
+      genre: genre,
+      year:
+        movie.release_date || movie.first_air_date
+          ? (movie.release_date || movie.first_air_date).substring(0, 4)
+          : 'Unknown',
+      description: movie.overview,
+      genres: movie.genre_ids
+        ? movie.genre_ids
+            .map((id) => genreMap[id] || 'Unknown')
+            .filter((name) => name !== 'Unknown')
+        : [],
+    }
+  }
 
   // Load genres for proper display and search
   useEffect(() => {
@@ -113,16 +186,38 @@ function SearchPage() {
         // Fetch TV genres
         const tvGenres = await fetchGenres('tv')
 
-        // Combine genres and remove duplicates
-        const allGenres = [
-          ...movieGenres,
-          ...tvGenres.filter(
-            (tvGenre) =>
-              !movieGenres.some(
-                (movieGenre) => movieGenre.name === tvGenre.name
-              )
-          ),
-        ]
+        // Create a map to track unique genres by name to avoid duplicates
+        const uniqueGenres = new Map()
+
+        // Process movie genres first
+        movieGenres.forEach((genre) => {
+          uniqueGenres.set(genre.name, {
+            ...genre,
+            source: 'movie',
+          })
+        })
+
+        // Add TV genres
+        tvGenres.forEach((genre) => {
+          // If we already have this genre from movies, mark it as both
+          if (uniqueGenres.has(genre.name)) {
+            uniqueGenres.set(genre.name, {
+              ...uniqueGenres.get(genre.name),
+              source: 'both',
+            })
+          } else {
+            // Otherwise add it as a TV genre
+            uniqueGenres.set(genre.name, {
+              ...genre,
+              source: 'tv',
+            })
+          }
+        })
+
+        // Convert map to array and sort alphabetically
+        const allGenres = Array.from(uniqueGenres.values()).sort((a, b) =>
+          a.name.localeCompare(b.name)
+        )
 
         // Create a map for quick lookups
         const genreMapping = {}
@@ -201,7 +296,7 @@ function SearchPage() {
     try {
       let results
 
-      if (activeTab === 'movies') {
+      if (activeTab === 'movie') {
         const data = await fetchMovies(
           { sort_by: 'popularity.desc' },
           currentPage
@@ -263,6 +358,14 @@ function SearchPage() {
   }
 
   const performSearch = async () => {
+    // If search query is empty, just load the popular/trending content
+    if (!searchQuery.trim()) {
+      loadPopularMovies()
+      loadFeaturedContent()
+      loadTrendingContent()
+      return
+    }
+
     setLoading(true)
     setError(null)
 
@@ -275,25 +378,40 @@ function SearchPage() {
       if (genreMatch) {
         const genreId = genreMatch[1]
         // Search by genre ID
-        const mediaType = activeTab === 'all' ? null : activeTab
+        const mediaType = activeTab === 'all' ? 'movie' : activeTab
         const data = await searchByGenre(genreId, mediaType, page)
         results = data.results
         setTotalPages(data.total_pages)
         setTotalResults(data.total_results)
       } else {
         // Normal text search
-        const params = {
-          query: searchQuery,
-          page,
+        let type = 'multi'
+
+        // If a specific tab is selected, use the appropriate search type
+        if (activeTab === 'movie') {
+          type = 'movie'
+        } else if (activeTab === 'tv') {
+          type = 'tv'
         }
 
-        // If a specific tab is selected, filter by media type
-        if (activeTab !== 'all') {
-          params.media_type = activeTab
-        }
-
-        const data = await searchTMDB(params)
+        console.log(
+          `Searching with type: ${type}, query: ${searchQuery}, page: ${page}`
+        )
+        const data = await searchMedia(searchQuery, type, page)
         results = data.results
+
+        // If using multi search but a specific tab is selected, filter the results
+        if (type === 'multi' && activeTab !== 'all') {
+          results = results.filter((item) => {
+            if (activeTab === 'movie') {
+              return item.media_type === 'movie'
+            } else if (activeTab === 'tv') {
+              return item.media_type === 'tv'
+            }
+            return true
+          })
+        }
+
         setTotalPages(data.total_pages)
         setTotalResults(data.total_results)
       }
@@ -315,13 +433,32 @@ function SearchPage() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
-    if (searchInput.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchInput.trim())}`)
+    if (debouncedSearchInput.trim()) {
+      // Reset to page 1 when submitting a new search
+      navigate(
+        `/search?q=${encodeURIComponent(
+          debouncedSearchInput.trim()
+        )}&page=1&tab=${activeTab}`
+      )
+      setCurrentPage(1)
+    } else {
+      // If search is empty, clear the search query and return to default view
+      navigate(`/search`)
+      setCurrentPage(1)
     }
-    setCurrentPage(1)
   }
 
   const handlePageChange = (newPage) => {
+    // Preserve search query and tab when changing pages
+    if (searchQuery) {
+      navigate(
+        `/search?q=${encodeURIComponent(
+          searchQuery
+        )}&page=${newPage}&tab=${activeTab}`
+      )
+    } else {
+      navigate(`/search?page=${newPage}&tab=${activeTab}`)
+    }
     setCurrentPage(newPage)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -392,14 +529,24 @@ function SearchPage() {
             <input
               type="text"
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => {
+                // Just update the local state without navigating
+                setSearchInput(e.target.value)
+              }}
               placeholder="Search movies, TV shows, actors..."
               className="w-full bg-[#1a1a1a] text-white py-2.5 px-4 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#5ccfee] border border-gray-800 shadow-sm"
             />
             {searchInput && (
               <button
                 type="button"
-                onClick={() => setSearchInput('')}
+                onClick={() => {
+                  // First clear the input
+                  setSearchInput('')
+                  // Then navigate after a short delay to avoid state conflicts
+                  setTimeout(() => {
+                    navigate('/search')
+                  }, 0)
+                }}
                 className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
               >
                 <svg
@@ -440,31 +587,43 @@ function SearchPage() {
             </button>
           </div>
 
-          {/* Compact Genre selector */}
+          {/* Genre selector with scrollable container */}
           {genreList.length > 0 && (
-            <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-              {genreList.slice(0, 8).map((genre) => (
-                <button
-                  key={genre.id}
-                  type="button"
-                  onClick={() => {
-                    // Toggle if genre is currently selected
-                    const newSearchInput = searchInput.includes(
-                      `genre:${genre.name}`
-                    )
-                      ? searchInput.replace(`genre:${genre.name}`, '').trim()
-                      : `${searchInput.trim()} genre:${genre.name}`.trim()
-                    setSearchInput(newSearchInput)
-                  }}
-                  className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                    searchInput.includes(`genre:${genre.name}`)
-                      ? 'bg-[#5ccfee] text-black'
-                      : 'bg-[#252525] text-white hover:bg-[#333]'
-                  }`}
-                >
-                  {genre.name}
-                </button>
-              ))}
+            <div className="mt-4 mb-2">
+              <h2 className="text-sm text-gray-400 text-center mb-2">
+                Browse by Genre
+              </h2>
+              <div className="max-w-full overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-transparent">
+                <div className="flex flex-wrap gap-2 justify-center min-w-max px-2">
+                  {genreList.map((genre) => (
+                    <button
+                      key={genre.id}
+                      type="button"
+                      onClick={() => {
+                        // Use the genre name directly as search term
+                        const newValue = genre.name
+                        setSearchInput(newValue)
+
+                        // Auto-search after setting the genre
+                        setTimeout(() => {
+                          navigate(
+                            `/search?q=${encodeURIComponent(
+                              newValue
+                            )}&page=1&tab=${activeTab}`
+                          )
+                        }, 10)
+                      }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                        searchInput === genre.name
+                          ? 'bg-[#5ccfee] text-black shadow-lg shadow-[#5ccfee]/20'
+                          : 'bg-[#252525] text-white hover:bg-[#333] hover:scale-105'
+                      }`}
+                    >
+                      {genre.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </form>
@@ -495,47 +654,7 @@ function SearchPage() {
               <h2 className="text-xl text-white font-medium pl-1">
                 Trending Now
               </h2>
-              <div className="flex items-center space-x-6 pr-2">
-                <button
-                  onClick={() => {
-                    setActiveTab('all')
-                    setCurrentPage(1)
-                  }}
-                  className={`text-sm font-medium transition-colors border-b-2 pb-0.5 ${
-                    activeTab === 'all'
-                      ? 'text-[#5ccfee] border-[#5ccfee]'
-                      : 'text-gray-400 border-transparent hover:text-white'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab('movies')
-                    setCurrentPage(1)
-                  }}
-                  className={`text-sm font-medium transition-colors border-b-2 pb-0.5 ${
-                    activeTab === 'movies'
-                      ? 'text-[#5ccfee] border-[#5ccfee]'
-                      : 'text-gray-400 border-transparent hover:text-white'
-                  }`}
-                >
-                  Movies
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab('tv')
-                    setCurrentPage(1)
-                  }}
-                  className={`text-sm font-medium transition-colors border-b-2 pb-0.5 ${
-                    activeTab === 'tv'
-                      ? 'text-[#5ccfee] border-[#5ccfee]'
-                      : 'text-gray-400 border-transparent hover:text-white'
-                  }`}
-                >
-                  TV Shows
-                </button>
-              </div>
+              {/* Only show filter tabs when searching */}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
@@ -552,17 +671,87 @@ function SearchPage() {
         {/* Content tabs */}
         {!loading && searchResults.length > 0 && (
           <div>
-            <h2 className="text-xl text-white font-medium mb-5 pl-1">
-              Search Results
-              {searchQuery && (
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl text-white font-medium pl-1">
+                Search Results
                 <span className="text-gray-400 ml-1">for "{searchQuery}"</span>
-              )}
-              {totalResults > 0 && (
-                <span className="text-sm text-gray-400 font-normal ml-2">
-                  ({totalResults} results)
-                </span>
-              )}
-            </h2>
+                {totalResults > 0 && (
+                  <span className="text-sm text-gray-400 font-normal ml-2">
+                    ({totalResults} results)
+                  </span>
+                )}
+              </h2>
+
+              {/* Show filter tabs for search results */}
+              <div className="flex items-center space-x-6 pr-2">
+                <button
+                  onClick={() => {
+                    setActiveTab('all')
+                    setCurrentPage(1)
+                    if (searchQuery) {
+                      navigate(
+                        `/search?q=${encodeURIComponent(
+                          searchQuery
+                        )}&page=1&tab=all`
+                      )
+                    } else {
+                      navigate(`/search?page=1&tab=all`)
+                    }
+                  }}
+                  className={`text-sm font-medium transition-colors border-b-2 pb-0.5 ${
+                    activeTab === 'all'
+                      ? 'text-[#5ccfee] border-[#5ccfee]'
+                      : 'text-gray-400 border-transparent hover:text-white'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab('movie')
+                    setCurrentPage(1)
+                    if (searchQuery) {
+                      navigate(
+                        `/search?q=${encodeURIComponent(
+                          searchQuery
+                        )}&page=1&tab=movie`
+                      )
+                    } else {
+                      navigate(`/search?page=1&tab=movie`)
+                    }
+                  }}
+                  className={`text-sm font-medium transition-colors border-b-2 pb-0.5 ${
+                    activeTab === 'movie'
+                      ? 'text-[#5ccfee] border-[#5ccfee]'
+                      : 'text-gray-400 border-transparent hover:text-white'
+                  }`}
+                >
+                  Movies
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab('tv')
+                    setCurrentPage(1)
+                    if (searchQuery) {
+                      navigate(
+                        `/search?q=${encodeURIComponent(
+                          searchQuery
+                        )}&page=1&tab=tv`
+                      )
+                    } else {
+                      navigate(`/search?page=1&tab=tv`)
+                    }
+                  }}
+                  className={`text-sm font-medium transition-colors border-b-2 pb-0.5 ${
+                    activeTab === 'tv'
+                      ? 'text-[#5ccfee] border-[#5ccfee]'
+                      : 'text-gray-400 border-transparent hover:text-white'
+                  }`}
+                >
+                  TV Shows
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
               {searchResults.map((movie) => (
@@ -570,7 +759,7 @@ function SearchPage() {
               ))}
             </div>
 
-            {/* Pagination */}
+            {/* Pagination - Only show for search results */}
             {totalPages > 1 && (
               <div className="mt-10 flex justify-center">
                 <Pagination
@@ -600,7 +789,7 @@ function SearchPage() {
         {!searchQuery && !loading && popularMovies.length > 0 && (
           <div className="mt-12">
             <h2 className="text-xl text-white font-medium mb-5 pl-1">
-              {activeTab === 'movies'
+              {activeTab === 'movie'
                 ? 'Popular Movies'
                 : activeTab === 'tv'
                 ? 'Popular TV Shows'
@@ -613,16 +802,7 @@ function SearchPage() {
               ))}
             </div>
 
-            {/* Pagination for popular content */}
-            {totalPages > 1 && (
-              <div className="mt-10 flex justify-center">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                />
-              </div>
-            )}
+            {/* Don't show pagination for popular content */}
           </div>
         )}
 
