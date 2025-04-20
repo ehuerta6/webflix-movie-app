@@ -107,8 +107,9 @@ function User() {
     setUserProfile,
   } = useAuth()
   const [userStats, setUserStats] = useState({
-    movieCount: 0,
-    showCount: 0,
+    totalWatched: 0,
+    favoriteCount: 0,
+    watchlistCount: 0,
   })
 
   // API data state
@@ -160,26 +161,16 @@ function User() {
       const watchlist = userProfile.watchlist || []
       const watched = userProfile.watched || []
 
-      const movieFavorites = favorites.filter(
-        (item) => item.type === 'movie'
-      ).length
-      const showFavorites = favorites.filter(
-        (item) => item.type === 'tv'
-      ).length
-      const movieWatchlist = watchlist.filter(
-        (item) => item.type === 'movie'
-      ).length
-      const showWatchlist = watchlist.filter(
-        (item) => item.type === 'tv'
-      ).length
+      // Only calculate counts needed for our stats display
       const movieWatched = watched.filter(
         (item) => item.type === 'movie'
       ).length
       const showWatched = watched.filter((item) => item.type === 'tv').length
 
       setUserStats({
-        movieCount: movieFavorites + movieWatchlist + movieWatched,
-        showCount: showFavorites + showWatchlist + showWatched,
+        totalWatched: movieWatched + showWatched,
+        favoriteCount: favorites.length,
+        watchlistCount: watchlist.length,
       })
     }
   }, [userProfile])
@@ -1203,7 +1194,7 @@ function User() {
                 </div>
 
                 {/* User stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                <div className="grid grid-cols-3 gap-3 mb-6">
                   <StatItem
                     icon={
                       <svg
@@ -1217,32 +1208,12 @@ function User() {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={1.5}
-                          d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
+                          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
                         />
                       </svg>
                     }
-                    label="Movies"
-                    value={userStats.movieCount}
-                  />
-                  <StatItem
-                    icon={
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-8 w-8 mr-2 text-[#5ccfee]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                        />
-                      </svg>
-                    }
-                    label="TV Shows"
-                    value={userStats.showCount}
+                    label="Watched"
+                    value={userStats.totalWatched}
                   />
                   <StatItem
                     icon={
@@ -1262,7 +1233,7 @@ function User() {
                       </svg>
                     }
                     label="Favorites"
-                    value={(userProfile?.favorites || []).length}
+                    value={userStats.favoriteCount}
                   />
                   <StatItem
                     icon={
@@ -1282,7 +1253,7 @@ function User() {
                       </svg>
                     }
                     label="Watchlist"
-                    value={(userProfile?.watchlist || []).length}
+                    value={userStats.watchlistCount}
                   />
                 </div>
 
