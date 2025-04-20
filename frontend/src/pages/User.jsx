@@ -112,9 +112,9 @@ function User() {
   })
 
   // API data state
-  const [likedMovies, setLikedMovies] = useState([])
+  // const [likedMovies, setLikedMovies] = useState([])
   const [watchlistMovies, setWatchlistMovies] = useState([])
-  const [watchedMovies, setWatchedMovies] = useState([])
+  // const [watchedMovies, setWatchedMovies] = useState([])
   const [loading, setLoading] = useState({
     genres: false,
     liked: false,
@@ -332,10 +332,10 @@ function User() {
             }
           })
 
-        setLikedMovies(formattedFavorites)
+        // setLikedMovies(formattedFavorites)
         console.log('Formatted favorites:', formattedFavorites)
       } else {
-        setLikedMovies([])
+        // setLikedMovies([])
         console.log('No favorites found in user profile')
       }
 
@@ -501,10 +501,10 @@ function User() {
             }
           })
 
-        setWatchedMovies(formattedWatched)
+        // setWatchedMovies(formattedWatched)
         console.log('Formatted watched movies:', formattedWatched)
       } else {
-        setWatchedMovies([])
+        // setWatchedMovies([])
         console.log('No watched movies found in user profile')
       }
     } catch (error) {
@@ -767,7 +767,7 @@ function User() {
       await removeFromFavorites(mediaId, 'movie')
 
       // Update local state instead of reloading the entire profile
-      setLikedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
+      // setLikedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
 
       // Also update the userProfile state to keep it in sync
       setUserProfile((prev) => ({
@@ -788,7 +788,7 @@ function User() {
       await removeFromWatched(mediaId, 'movie')
 
       // Update local state instead of reloading the entire profile
-      setWatchedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
+      // setWatchedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
 
       // Also update the userProfile state to keep it in sync
       setUserProfile((prev) => ({
@@ -979,34 +979,62 @@ function User() {
   return (
     <div className="min-h-screen bg-[#121212] text-white pb-16">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* User Profile Header Section */}
-        <div className="mb-12">
-          <div className="flex justify-between items-start mb-6">
-            <button
-              onClick={handleGoBack}
-              className="text-gray-400 hover:text-white flex items-center gap-1"
+        {/* Back button at the top */}
+        <div className="mb-6">
+          <button
+            onClick={handleGoBack}
+            className="text-gray-400 hover:text-white flex items-center gap-1"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
-              <span>Back</span>
-            </button>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            <span>Back</span>
+          </button>
+        </div>
 
-            <div className="flex gap-3">
-              {!isEditingProfile && (
+        {/* Side-by-side layout container */}
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* User Profile Section - Take 60% on larger screens */}
+          <div className="md:w-[60%]">
+            <div className="flex justify-between items-start mb-6">
+              <h2 className="text-2xl font-bold">Profile</h2>
+
+              <div className="flex gap-3">
+                {!isEditingProfile && (
+                  <button
+                    onClick={handleProfileEdit}
+                    className="flex items-center gap-1 text-sm font-medium text-white bg-[#1e1e1e] hover:bg-[#2a2a2a] px-3 py-1.5 rounded-md"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                      />
+                    </svg>
+                    Edit Profile
+                  </button>
+                )}
                 <button
-                  onClick={handleProfileEdit}
+                  onClick={handleSettingsToggle}
                   className="flex items-center gap-1 text-sm font-medium text-white bg-[#1e1e1e] hover:bg-[#2a2a2a] px-3 py-1.5 rounded-md"
                 >
                   <svg
@@ -1020,465 +1048,423 @@ function User() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                     />
                   </svg>
-                  Edit Profile
+                  Settings
                 </button>
-              )}
-              <button
-                onClick={handleSettingsToggle}
-                className="flex items-center gap-1 text-sm font-medium text-white bg-[#1e1e1e] hover:bg-[#2a2a2a] px-3 py-1.5 rounded-md"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              </div>
+            </div>
+
+            {/* User info card */}
+            <div className="bg-[#1a1a1a] rounded-lg overflow-hidden">
+              {/* Profile header with background */}
+              <div className="h-32 bg-gradient-to-r from-[#00BFFF] to-[#5ccfee] relative">
+                <div className="absolute -bottom-12 left-8 h-24 w-24 bg-[#1a1a1a] rounded-full border-4 border-[#1a1a1a] overflow-hidden">
+                  <div className="h-full w-full bg-[#5ccfee] flex items-center justify-center text-3xl font-bold text-[#1a1a1a]">
+                    {userProfile?.displayName?.charAt(0).toUpperCase() ||
+                      currentUser?.email?.charAt(0).toUpperCase() ||
+                      'U'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Profile content */}
+              <div className="pt-16 pb-6 px-8">
+                <div className="mb-4">
+                  <h1 className="text-2xl font-bold">
+                    {isEditingProfile ? (
+                      <input
+                        type="text"
+                        name="name"
+                        value={editForm.name}
+                        onChange={handleEditFormChange}
+                        className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full max-w-md"
+                        placeholder="Display Name"
+                      />
+                    ) : (
+                      userProfile?.displayName || 'Webflix User'
+                    )}
+                  </h1>
+                  {isEditingProfile ? (
+                    <div className="mt-2 mb-2">
+                      <label className="block text-sm font-bold text-gray-300 mb-1">
+                        USERNAME
+                      </label>
+                      <input
+                        type="text"
+                        name="username"
+                        value={editForm.username}
+                        onChange={handleEditFormChange}
+                        className={`bg-[#252525] text-white px-3 py-1.5 rounded border ${
+                          editForm.username && editForm.username.includes(' ')
+                            ? 'border-red-500'
+                            : 'border-[#333]'
+                        } w-full max-w-md`}
+                        placeholder="Username (no spaces)"
+                      />
+                      {editForm.username && editForm.username.includes(' ') && (
+                        <p className="text-xs text-red-400 mt-1">
+                          Username cannot contain spaces
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    userProfile?.username && (
+                      <p className="text-[#5ccfee] font-medium">
+                        @{userProfile.username}
+                      </p>
+                    )
+                  )}
+                  <p className="text-gray-400">{currentUser?.email}</p>
+                </div>
+
+                {/* Bio section */}
+                <div className="mb-6">
+                  <h2 className="text-sm font-bold text-gray-300 mb-2">
+                    ABOUT ME
+                  </h2>
+                  {isEditingProfile ? (
+                    <textarea
+                      name="bio"
+                      value={editForm.bio}
+                      onChange={handleEditFormChange}
+                      rows="3"
+                      className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full max-w-lg"
+                      placeholder="Tell us about yourself and what you like to watch..."
+                    ></textarea>
+                  ) : (
+                    <p className="text-gray-300">
+                      {userProfile?.bio ||
+                        'No bio yet. Click Edit Profile to add one!'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Display error message for profile form */}
+                {isEditingProfile && profileError && (
+                  <div className="mb-6 bg-red-500/10 text-red-500 p-3 rounded-md max-w-lg">
+                    {profileError}
+                  </div>
+                )}
+
+                {/* Favorite Genres section */}
+                <div className="mb-6">
+                  <h2 className="text-sm font-bold text-gray-300 mb-2">
+                    FAVORITE GENRES
+                  </h2>
+                  {isEditingProfile ? (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {loading.genres ? (
+                        <div className="flex items-center text-gray-400 text-xs py-1">
+                          <div className="animate-spin h-3 w-3 border-b border-[#5ccfee] rounded-full mr-2"></div>
+                          Loading genres...
+                        </div>
+                      ) : availableGenres.length > 0 ? (
+                        availableGenres.map((genre) => (
+                          <GenreToggle
+                            key={genre}
+                            genre={genre}
+                            selected={editForm.selectedGenres.includes(genre)}
+                            onToggle={handleGenreToggle}
+                          />
+                        ))
+                      ) : (
+                        <p className="text-gray-400 text-sm">
+                          No genres available
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {userProfile?.favoriteGenres?.length > 0 ? (
+                        userProfile.favoriteGenres.map((genre, index) => (
+                          <span
+                            key={index}
+                            className="px-3 py-1.5 bg-[#252525] text-[#5ccfee] rounded-md text-sm"
+                          >
+                            {genre}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 text-sm">
+                          No favorite genres selected yet. Click Edit Profile to
+                          add some!
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* User stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                  <StatItem
+                    icon={
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-8 w-8 mr-2 text-[#5ccfee]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
+                        />
+                      </svg>
+                    }
+                    label="Movies"
+                    value={userStats.movieCount}
                   />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  <StatItem
+                    icon={
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-8 w-8 mr-2 text-[#5ccfee]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
+                      </svg>
+                    }
+                    label="TV Shows"
+                    value={userStats.showCount}
                   />
-                </svg>
-                Settings
-              </button>
+                  <StatItem
+                    icon={
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-8 w-8 mr-2 text-[#5ccfee]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                        />
+                      </svg>
+                    }
+                    label="Favorites"
+                    value={(userProfile?.favorites || []).length}
+                  />
+                  <StatItem
+                    icon={
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-8 w-8 mr-2 text-[#5ccfee]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                        />
+                      </svg>
+                    }
+                    label="Watchlist"
+                    value={(userProfile?.watchlist || []).length}
+                  />
+                </div>
+
+                {/* Settings form */}
+                {isSettingsOpen && (
+                  <div className="bg-[#1e1e1e] rounded-lg p-6 mb-6">
+                    <h2 className="text-lg font-bold mb-4">Account Settings</h2>
+                    <form onSubmit={handleSettingsSubmit}>
+                      <div className="grid gap-4 max-w-md">
+                        {/* Error message */}
+                        {settingsError && (
+                          <div className="bg-red-500/10 text-red-500 p-3 rounded-md text-sm">
+                            {settingsError}
+                          </div>
+                        )}
+
+                        {/* Success message */}
+                        {settingsSuccess && (
+                          <div className="bg-green-500/10 text-green-500 p-3 rounded-md text-sm">
+                            {settingsSuccess}
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Email Address
+                          </label>
+                          <input
+                            type="email"
+                            name="email"
+                            value={settingsForm.email}
+                            onChange={handleSettingsFormChange}
+                            className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full"
+                            placeholder="Email"
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Current Password{' '}
+                            <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="password"
+                            name="currentPassword"
+                            value={settingsForm.currentPassword}
+                            onChange={handleSettingsFormChange}
+                            className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full"
+                            placeholder="Current Password"
+                            required
+                            disabled={isSubmitting}
+                          />
+                          <p className="text-xs text-gray-400 mt-1">
+                            Required for any account changes
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-1">
+                            New Password
+                          </label>
+                          <input
+                            type="password"
+                            name="newPassword"
+                            value={settingsForm.newPassword}
+                            onChange={handleSettingsFormChange}
+                            className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full"
+                            placeholder="New Password"
+                            disabled={isSubmitting}
+                          />
+                          {settingsForm.newPassword &&
+                            settingsForm.newPassword.length < 6 && (
+                              <p className="text-xs text-yellow-400 mt-1">
+                                Password must be at least 6 characters
+                              </p>
+                            )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Confirm New Password
+                          </label>
+                          <input
+                            type="password"
+                            name="confirmPassword"
+                            value={settingsForm.confirmPassword}
+                            onChange={handleSettingsFormChange}
+                            className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full"
+                            placeholder="Confirm New Password"
+                            disabled={isSubmitting}
+                          />
+                          {settingsForm.newPassword &&
+                            settingsForm.confirmPassword &&
+                            settingsForm.newPassword !==
+                              settingsForm.confirmPassword && (
+                              <p className="text-xs text-red-400 mt-1">
+                                Passwords do not match
+                              </p>
+                            )}
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            type="button"
+                            onClick={handleSettingsToggle}
+                            className="px-4 py-2 text-sm font-medium rounded bg-[#252525] text-gray-200 hover:bg-[#333] disabled:opacity-50"
+                            disabled={isSubmitting}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-4 py-2 text-sm font-medium rounded bg-[#5ccfee] text-black hover:bg-[#4abfe0] disabled:opacity-50 flex items-center justify-center"
+                            disabled={isSubmitting}
+                          >
+                            {isSubmitting ? (
+                              <>
+                                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></span>
+                                Saving...
+                              </>
+                            ) : (
+                              'Save Changes'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {/* Edit profile form submission buttons */}
+                {isEditingProfile && (
+                  <div className="flex gap-3 mt-8">
+                    <button
+                      onClick={() => setIsEditingProfile(false)}
+                      className="px-4 py-2 rounded text-white bg-[#333] hover:bg-[#444] disabled:opacity-50"
+                      disabled={profileSubmitting}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleProfileSubmit}
+                      className="px-4 py-2 rounded text-black bg-[#5ccfee] hover:bg-[#4abfe0] disabled:opacity-50 flex items-center justify-center"
+                      disabled={profileSubmitting}
+                      type="button"
+                    >
+                      {profileSubmitting ? (
+                        <>
+                          <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></span>
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Profile'
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* User info card */}
-          <div className="bg-[#1a1a1a] rounded-lg overflow-hidden">
-            {/* Profile header with background */}
-            <div className="h-32 bg-gradient-to-r from-[#00BFFF] to-[#5ccfee] relative">
-              <div className="absolute -bottom-12 left-8 h-24 w-24 bg-[#1a1a1a] rounded-full border-4 border-[#1a1a1a] overflow-hidden">
-                <div className="h-full w-full bg-[#5ccfee] flex items-center justify-center text-3xl font-bold text-[#1a1a1a]">
-                  {userProfile?.displayName?.charAt(0).toUpperCase() ||
-                    currentUser?.email?.charAt(0).toUpperCase() ||
-                    'U'}
-                </div>
+          {/* Movies Collections Section - Take 40% on larger screens */}
+          <div className="md:w-[40%]">
+            {loading.profile ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin h-10 w-10 border-4 border-[#5ccfee] rounded-full border-t-transparent"></div>
               </div>
-            </div>
-
-            {/* Profile content */}
-            <div className="pt-16 pb-6 px-8">
-              <div className="mb-4">
-                <h1 className="text-2xl font-bold">
-                  {isEditingProfile ? (
-                    <input
-                      type="text"
-                      name="name"
-                      value={editForm.name}
-                      onChange={handleEditFormChange}
-                      className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full max-w-md"
-                      placeholder="Display Name"
+            ) : (
+              <div className="space-y-6">
+                {/* Only Watchlist Collection */}
+                <div className="bg-[#1e1e1e] rounded-lg shadow-md overflow-hidden border border-[#2a2a2a]">
+                  <div className="p-4">
+                    <MovieCollection
+                      title="My Watchlist"
+                      movies={watchlistMovies}
+                      actions={collectionActions.watchlist}
+                      isLoading={loading.watchlist}
                     />
-                  ) : (
-                    userProfile?.displayName || 'Webflix User'
-                  )}
-                </h1>
-                {isEditingProfile ? (
-                  <div className="mt-2 mb-2">
-                    <label className="block text-sm font-bold text-gray-300 mb-1">
-                      USERNAME
-                    </label>
-                    <input
-                      type="text"
-                      name="username"
-                      value={editForm.username}
-                      onChange={handleEditFormChange}
-                      className={`bg-[#252525] text-white px-3 py-1.5 rounded border ${
-                        editForm.username && editForm.username.includes(' ')
-                          ? 'border-red-500'
-                          : 'border-[#333]'
-                      } w-full max-w-md`}
-                      placeholder="Username (no spaces)"
-                    />
-                    {editForm.username && editForm.username.includes(' ') && (
-                      <p className="text-xs text-red-400 mt-1">
-                        Username cannot contain spaces
-                      </p>
-                    )}
                   </div>
-                ) : (
-                  userProfile?.username && (
-                    <p className="text-[#5ccfee] font-medium">
-                      @{userProfile.username}
-                    </p>
-                  )
-                )}
-                <p className="text-gray-400">{currentUser?.email}</p>
-              </div>
-
-              {/* Bio section */}
-              <div className="mb-6">
-                <h2 className="text-sm font-bold text-gray-300 mb-2">
-                  ABOUT ME
-                </h2>
-                {isEditingProfile ? (
-                  <textarea
-                    name="bio"
-                    value={editForm.bio}
-                    onChange={handleEditFormChange}
-                    rows="3"
-                    className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full max-w-lg"
-                    placeholder="Tell us about yourself and what you like to watch..."
-                  ></textarea>
-                ) : (
-                  <p className="text-gray-300">
-                    {userProfile?.bio ||
-                      'No bio yet. Click Edit Profile to add one!'}
-                  </p>
-                )}
-              </div>
-
-              {/* Display error message for profile form */}
-              {isEditingProfile && profileError && (
-                <div className="mb-6 bg-red-500/10 text-red-500 p-3 rounded-md max-w-lg">
-                  {profileError}
                 </div>
-              )}
-
-              {/* Favorite Genres section */}
-              <div className="mb-6">
-                <h2 className="text-sm font-bold text-gray-300 mb-2">
-                  FAVORITE GENRES
-                </h2>
-                {isEditingProfile ? (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {loading.genres ? (
-                      <div className="flex items-center text-gray-400 text-xs py-1">
-                        <div className="animate-spin h-3 w-3 border-b border-[#5ccfee] rounded-full mr-2"></div>
-                        Loading genres...
-                      </div>
-                    ) : availableGenres.length > 0 ? (
-                      availableGenres.map((genre) => (
-                        <GenreToggle
-                          key={genre}
-                          genre={genre}
-                          selected={editForm.selectedGenres.includes(genre)}
-                          onToggle={handleGenreToggle}
-                        />
-                      ))
-                    ) : (
-                      <p className="text-gray-400 text-sm">
-                        No genres available
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {userProfile?.favoriteGenres?.length > 0 ? (
-                      userProfile.favoriteGenres.map((genre, index) => (
-                        <span
-                          key={index}
-                          className="px-3 py-1.5 bg-[#252525] text-[#5ccfee] rounded-md text-sm"
-                        >
-                          {genre}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-gray-400 text-sm">
-                        No favorite genres selected yet. Click Edit Profile to
-                        add some!
-                      </span>
-                    )}
-                  </div>
-                )}
               </div>
-
-              {/* User stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                <StatItem
-                  icon={
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-8 w-8 mr-2 text-[#5ccfee]"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
-                      />
-                    </svg>
-                  }
-                  label="Movies"
-                  value={userStats.movieCount}
-                />
-                <StatItem
-                  icon={
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-8 w-8 mr-2 text-[#5ccfee]"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      />
-                    </svg>
-                  }
-                  label="TV Shows"
-                  value={userStats.showCount}
-                />
-                <StatItem
-                  icon={
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-8 w-8 mr-2 text-[#5ccfee]"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                      />
-                    </svg>
-                  }
-                  label="Favorites"
-                  value={(userProfile?.favorites || []).length}
-                />
-                <StatItem
-                  icon={
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-8 w-8 mr-2 text-[#5ccfee]"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                      />
-                    </svg>
-                  }
-                  label="Watchlist"
-                  value={(userProfile?.watchlist || []).length}
-                />
-              </div>
-
-              {/* Settings form */}
-              {isSettingsOpen && (
-                <div className="bg-[#1e1e1e] rounded-lg p-6 mb-6">
-                  <h2 className="text-lg font-bold mb-4">Account Settings</h2>
-                  <form onSubmit={handleSettingsSubmit}>
-                    <div className="grid gap-4 max-w-md">
-                      {/* Error message */}
-                      {settingsError && (
-                        <div className="bg-red-500/10 text-red-500 p-3 rounded-md text-sm">
-                          {settingsError}
-                        </div>
-                      )}
-
-                      {/* Success message */}
-                      {settingsSuccess && (
-                        <div className="bg-green-500/10 text-green-500 p-3 rounded-md text-sm">
-                          {settingsSuccess}
-                        </div>
-                      )}
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                          Email Address
-                        </label>
-                        <input
-                          type="email"
-                          name="email"
-                          value={settingsForm.email}
-                          onChange={handleSettingsFormChange}
-                          className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full"
-                          placeholder="Email"
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                          Current Password{' '}
-                          <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                          type="password"
-                          name="currentPassword"
-                          value={settingsForm.currentPassword}
-                          onChange={handleSettingsFormChange}
-                          className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full"
-                          placeholder="Current Password"
-                          required
-                          disabled={isSubmitting}
-                        />
-                        <p className="text-xs text-gray-400 mt-1">
-                          Required for any account changes
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                          New Password
-                        </label>
-                        <input
-                          type="password"
-                          name="newPassword"
-                          value={settingsForm.newPassword}
-                          onChange={handleSettingsFormChange}
-                          className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full"
-                          placeholder="New Password"
-                          disabled={isSubmitting}
-                        />
-                        {settingsForm.newPassword &&
-                          settingsForm.newPassword.length < 6 && (
-                            <p className="text-xs text-yellow-400 mt-1">
-                              Password must be at least 6 characters
-                            </p>
-                          )}
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                          Confirm New Password
-                        </label>
-                        <input
-                          type="password"
-                          name="confirmPassword"
-                          value={settingsForm.confirmPassword}
-                          onChange={handleSettingsFormChange}
-                          className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full"
-                          placeholder="Confirm New Password"
-                          disabled={isSubmitting}
-                        />
-                        {settingsForm.newPassword &&
-                          settingsForm.confirmPassword &&
-                          settingsForm.newPassword !==
-                            settingsForm.confirmPassword && (
-                            <p className="text-xs text-red-400 mt-1">
-                              Passwords do not match
-                            </p>
-                          )}
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          type="button"
-                          onClick={handleSettingsToggle}
-                          className="px-4 py-2 text-sm font-medium rounded bg-[#252525] text-gray-200 hover:bg-[#333] disabled:opacity-50"
-                          disabled={isSubmitting}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-4 py-2 text-sm font-medium rounded bg-[#5ccfee] text-black hover:bg-[#4abfe0] disabled:opacity-50 flex items-center justify-center"
-                          disabled={isSubmitting}
-                        >
-                          {isSubmitting ? (
-                            <>
-                              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></span>
-                              Saving...
-                            </>
-                          ) : (
-                            'Save Changes'
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-              {/* Edit profile form submission buttons */}
-              {isEditingProfile && (
-                <div className="flex gap-3 mt-8">
-                  <button
-                    onClick={() => setIsEditingProfile(false)}
-                    className="px-4 py-2 rounded text-white bg-[#333] hover:bg-[#444] disabled:opacity-50"
-                    disabled={profileSubmitting}
-                    type="button"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleProfileSubmit}
-                    className="px-4 py-2 rounded text-black bg-[#5ccfee] hover:bg-[#4abfe0] disabled:opacity-50 flex items-center justify-center"
-                    disabled={profileSubmitting}
-                    type="button"
-                  >
-                    {profileSubmitting ? (
-                      <>
-                        <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></span>
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Profile'
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
-
-        {/* Rest of the component remains unchanged */}
-        {loading.profile ? (
-          <div className="flex items-center justify-center h-screen">
-            <div className="animate-spin h-10 w-10 border-4 border-[#5ccfee] rounded-full border-t-transparent"></div>
-          </div>
-        ) : (
-          <div className="max-w-5xl mx-auto space-y-4">
-            {/* Liked Movies Collection */}
-            <div className="bg-[#1e1e1e] rounded-lg shadow-md overflow-hidden border border-[#2a2a2a]">
-              <div className="p-4">
-                <MovieCollection
-                  title="Liked Movies"
-                  movies={likedMovies}
-                  actions={collectionActions.liked}
-                  isLoading={loading.liked}
-                />
-              </div>
-            </div>
-
-            {/* Watchlist Collection */}
-            <div className="bg-[#1e1e1e] rounded-lg shadow-md overflow-hidden border border-[#2a2a2a]">
-              <div className="p-4">
-                <MovieCollection
-                  title="Watchlist"
-                  movies={watchlistMovies}
-                  actions={collectionActions.watchlist}
-                  isLoading={loading.watchlist}
-                />
-              </div>
-            </div>
-
-            {/* Watched Movies Collection */}
-            <div className="bg-[#1e1e1e] rounded-lg shadow-md overflow-hidden border border-[#2a2a2a]">
-              <div className="p-4">
-                <MovieCollection
-                  title="Watched Movies"
-                  movies={watchedMovies}
-                  actions={collectionActions.watched}
-                  isLoading={loading.watched}
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
