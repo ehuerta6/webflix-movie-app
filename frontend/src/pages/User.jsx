@@ -974,9 +974,14 @@ function User() {
         console.log('Favorite genres updated successfully')
       }
 
-      // Success - immediately close the editing form without showing success message
-      setProfileError('') // Clear any error messages
-      setIsEditingProfile(false)
+      // Success message
+      setProfileError('Profile updated successfully!')
+
+      // Navigate back to profile view
+      setTimeout(() => {
+        setIsEditingProfile(false)
+        setProfileError('')
+      }, 1500)
     } catch (error) {
       console.error('Profile update failed:', error)
       setProfileError(error.message || 'Failed to update profile')
