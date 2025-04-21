@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Header from './Header'
 import Footer from './components/Footer'
 import Home from './pages/Home'
@@ -13,7 +13,7 @@ import './App.css'
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/webflix-movie-webapp">
       <div className="flex flex-col min-h-screen">
         <Header />
         <main className="flex-grow">
@@ -33,6 +33,7 @@ function App() {
               }
             />
             <Route path="/:type/:id" element={<Details />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
         <Footer />
