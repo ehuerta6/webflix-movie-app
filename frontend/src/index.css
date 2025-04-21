@@ -51,6 +51,7 @@
   background: #444;
 }
 
+/* Carousel animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
