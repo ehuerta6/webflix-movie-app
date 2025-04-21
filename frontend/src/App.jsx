@@ -9,12 +9,14 @@ import SearchPage from './pages/SearchPage'
 import Auth from './pages/Auth'
 import User from './pages/User'
 import ProtectedRoute from './components/ProtectedRoute'
+import ProfileLoader from './components/ProfileLoader'
 import './App.css'
 
 function App() {
   return (
     <BrowserRouter basename="/webflix-movie-webapp">
       <div className="flex flex-col min-h-screen">
+        <ProfileLoader />
         <Header />
         <main className="flex-grow">
           <Routes>

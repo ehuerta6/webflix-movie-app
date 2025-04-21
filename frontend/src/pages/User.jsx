@@ -262,18 +262,24 @@ function User() {
   // Fetch user profile on mount and when user changes
   useEffect(() => {
     if (currentUser?.uid) {
-      setLoading((prev) => ({ ...prev, profile: true }))
-      fetchUserProfile()
-        .then(() => {
-          setLoading((prev) => ({ ...prev, profile: false }))
-          setIsProfileReady(true)
-        })
-        .catch(() => {
-          setLoading((prev) => ({ ...prev, profile: false }))
-          setIsProfileReady(true)
-        })
+      // Only fetch if we don't already have a complete profile
+      if (!userProfile || !isProfileReady) {
+        setLoading((prev) => ({ ...prev, profile: true }))
+        fetchUserProfile()
+          .then(() => {
+            setLoading((prev) => ({ ...prev, profile: false }))
+            setIsProfileReady(true)
+          })
+          .catch(() => {
+            setLoading((prev) => ({ ...prev, profile: false }))
+            setIsProfileReady(true)
+          })
+      } else {
+        // Profile already loaded, just set ready state
+        setIsProfileReady(true)
+      }
     }
-  }, [currentUser?.uid])
+  }, [currentUser?.uid, userProfile, isProfileReady, fetchUserProfile])
 
   // Extract hex color from Tailwind class
   const extractColorFromClass = (colorClass) => {
