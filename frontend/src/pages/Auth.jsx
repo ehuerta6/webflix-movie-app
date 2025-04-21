@@ -126,7 +126,26 @@ function Auth() {
       navigate('/')
     } catch (error) {
       console.error('Google sign-in error:', error)
-      setLoginError('Failed to sign in with Google. Please try again.')
+
+      // Provide more specific error messages based on the error code
+      let errorMessage = 'Failed to sign in with Google. Please try again.'
+
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Sign-in popup was closed. Please try again.'
+      } else if (error.code === 'auth/popup-blocked') {
+        errorMessage =
+          'Sign-in popup was blocked by your browser. Please allow popups for this site.'
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        errorMessage = 'Multiple popup requests were made. Please try again.'
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage =
+          'Network error. Please check your internet connection and try again.'
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorMessage =
+          'This domain is not authorized for Google authentication. Please contact the administrator.'
+      }
+
+      setLoginError(errorMessage)
       setLoginLoading(false)
     }
   }

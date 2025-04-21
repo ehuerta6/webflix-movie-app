@@ -12,6 +12,8 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   updateEmail,
+  setPersistence,
+  browserSessionPersistence,
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore'
 import { useFireStore } from '../services/firestore'
@@ -88,6 +90,14 @@ export function AuthProvider({ children }) {
   // Sign in with Google
   const loginWithGoogle = async () => {
     try {
+      // Configure Google Auth provider with custom parameters
+      googleProvider.setCustomParameters({
+        prompt: 'select_account',
+      })
+
+      // Set persistence to SESSION to help with GitHub Pages
+      await setPersistence(auth, browserSessionPersistence)
+
       const result = await signInWithPopup(auth, googleProvider)
 
       // Check if user document exists, if not create it
