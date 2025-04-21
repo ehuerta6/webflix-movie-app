@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { fetchMovieDetails, fetchShowDetails } from '../services/api'
 import MediaActions from '../components/MediaActions'
+import { useAuth } from '../context/AuthContext'
 
 // Helper function with simplified content validation
 const isValidContent = (item) => {
@@ -163,6 +164,7 @@ const CastCard = ({ person }) => {
 function Details() {
   const { id, type } = useParams()
   const navigate = useNavigate()
+  const { currentUser, userProfile, fetchUserProfile } = useAuth()
   const [details, setDetails] = useState(null)
   const [similarContent, setSimilarContent] = useState([])
   const [cast, setCast] = useState([])
@@ -172,6 +174,13 @@ function Details() {
   // Image loading states
   const [backdropLoaded, setBackdropLoaded] = useState(false)
   const [posterLoaded, setPosterLoaded] = useState(false)
+
+  // Fetch user profile to get collection status when component mounts or when id/type changes
+  useEffect(() => {
+    if (currentUser) {
+      fetchUserProfile()
+    }
+  }, [currentUser, id, type, fetchUserProfile])
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -321,6 +330,19 @@ function Details() {
   }
 
   const handleGoBack = () => navigate(-1)
+
+  // Check if this media is in any of the user's collections
+  const isInWatchlist = userProfile?.watchlist?.some(
+    (item) => String(item.id) === String(id) && item.type === type
+  )
+
+  const isInFavorites = userProfile?.favorites?.some(
+    (item) => String(item.id) === String(id) && item.type === type
+  )
+
+  const isWatched = userProfile?.watched?.some(
+    (item) => String(item.id) === String(id) && item.type === type
+  )
 
   if (loading) {
     return (
@@ -534,6 +556,11 @@ function Details() {
                       )
                       .filter(Boolean),
                     overview: details.description,
+                  }}
+                  collectionStatus={{
+                    isInWatchlist,
+                    isInFavorites,
+                    isWatched,
                   }}
                 />
               </div>
