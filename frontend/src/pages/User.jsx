@@ -977,14 +977,8 @@ function User() {
         console.log('Favorite genres updated successfully')
       }
 
-      // Success message
-      setProfileError('Profile updated successfully!')
-
-      // Navigate back to profile view
-      setTimeout(() => {
-        setIsEditingProfile(false)
-        setProfileError('')
-      }, 1500)
+      // Exit edit mode smoothly without showing success message
+      setIsEditingProfile(false)
     } catch (error) {
       console.error('Profile update failed:', error)
       setProfileError(error.message || 'Failed to update profile')
@@ -2100,11 +2094,13 @@ function User() {
                 )}
 
                 {/* Display error message for profile form */}
-                {isEditingProfile && profileError && (
-                  <div className="mb-6 bg-red-500/10 text-red-500 p-3 rounded-md max-w-lg">
-                    {profileError}
-                  </div>
-                )}
+                {isEditingProfile &&
+                  profileError &&
+                  profileError !== 'Profile updated successfully!' && (
+                    <div className="mb-6 bg-red-500/10 text-red-500 p-3 rounded-md max-w-lg">
+                      {profileError}
+                    </div>
+                  )}
 
                 {/* Favorite Genres section */}
                 <div className="mb-6">
