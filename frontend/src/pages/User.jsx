@@ -742,32 +742,33 @@ function User() {
   const handleGoBack = () => navigate(-1)
 
   const handleProfileEdit = () => {
-    // Get raw colors - either from the userProfile object or extract from Tailwind classes
-    const rawProfileColor =
-      userProfile?.rawProfileColor ||
-      extractColorFromClass(userProfile?.profileColor) ||
-      DEFAULT_PROFILE_COLOR
-
-    const rawBannerColor =
-      userProfile?.rawBannerColor ||
-      extractColorFromClass(userProfile?.bannerColor) ||
-      DEFAULT_BANNER_COLOR
-
-    // Initialize the form with current userProfile data
+    // Pre-populate form with current user data
     setEditForm({
       name: userProfile?.displayName || '',
       username: userProfile?.username || '',
       bio: userProfile?.bio || '',
       selectedGenres: userProfile?.favoriteGenres || [],
-      profileColor:
-        userProfile?.profileColor || colorToTailwindBg(DEFAULT_PROFILE_COLOR),
-      bannerColor:
-        userProfile?.bannerColor || generateGradient(DEFAULT_BANNER_COLOR),
-      rawProfileColor: rawProfileColor,
-      rawBannerColor: rawBannerColor,
+      profileColor: userProfile?.profileColor || '',
+      bannerColor: userProfile?.bannerColor || '',
+      rawProfileColor: userProfile?.rawProfileColor || '#5ccfee',
+      rawBannerColor: userProfile?.rawBannerColor || '#00BFFF',
+      useProfileImage:
+        userProfile?.useProfileImage || !!userProfile?.photoURL || false,
     })
+
+    // Set image-related state
+    if (userProfile?.photoURL) {
+      setProfileImagePreview(userProfile.photoURL)
+      setProfileImageUrl(userProfile.photoURL)
+      setUseProfileImage(userProfile?.useProfileImage || true)
+    } else {
+      setProfileImagePreview(null)
+      setProfileImageUrl('')
+      setUseProfileImage(userProfile?.useProfileImage || false)
+    }
+
+    // Enter edit mode
     setIsEditingProfile(true)
-    setProfileError('')
   }
 
   const handleEditFormChange = (e) => {
@@ -916,7 +917,9 @@ function User() {
         displayName: editForm.name.trim(),
         username: editForm.username ? editForm.username.trim() : null,
         color: editForm.rawProfileColor || null,
+        bannerColor: editForm.rawBannerColor || null,
         bio: editForm.bio || null,
+        useProfileImage: editForm.useProfileImage,
       }
 
       // Update profile data
@@ -924,7 +927,7 @@ function User() {
       console.log('Profile data updated successfully')
 
       // Handle profile image if provided
-      if (profileImageUrl) {
+      if (profileImageUrl && editForm.useProfileImage) {
         try {
           setUploadingImage(true)
           // For new image uploads, always resize and compress if we have a file
@@ -949,7 +952,7 @@ function User() {
           setUploadingImage(false)
           return
         }
-      } else if (!useProfileImage && userProfile?.photoURL) {
+      } else if (!editForm.useProfileImage && userProfile?.photoURL) {
         // Handle profile image deletion if we switched from image to color
         try {
           await deleteProfileImage()
@@ -1715,8 +1718,9 @@ function User() {
                           currentUser?.email?.charAt(0).toUpperCase() ||
                           'U'}
                       </div>
-                    ) : userProfile?.photoURL ? (
-                      /* Show the profile image if available */
+                    ) : userProfile?.photoURL &&
+                      userProfile?.useProfileImage ? (
+                      /* Show the profile image if available and enabled */
                       <img
                         src={userProfile.photoURL}
                         alt="Profile"
@@ -1814,302 +1818,284 @@ function User() {
 
                 {/* Profile image or color toggle (only in edit mode) */}
                 {isEditingProfile && (
-                  <div className="mb-6">
-                    <h2 className="text-sm font-bold text-gray-300 mb-2">
-                      PROFILE DISPLAY
-                    </h2>
-                    <div className="flex gap-4">
-                      <button
-                        type="button"
-                        onClick={() => handleProfileTypeToggle(false)}
-                        className={`px-4 py-2 rounded text-sm ${
-                          !useProfileImage
-                            ? 'bg-[#5ccfee] text-black font-medium'
-                            : 'bg-[#252525] text-gray-300 hover:bg-[#333]'
-                        }`}
-                      >
-                        Color Icon
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleProfileTypeToggle(true)}
-                        className={`px-4 py-2 rounded text-sm ${
-                          useProfileImage
-                            ? 'bg-[#5ccfee] text-black font-medium'
-                            : 'bg-[#252525] text-gray-300 hover:bg-[#333]'
-                        }`}
-                      >
-                        Profile Image
-                      </button>
+                  <div className="space-y-6">
+                    {/* Profile Display Option */}
+                    <div className="mb-6">
+                      <h2 className="text-sm font-bold text-gray-300 mb-2">
+                        PROFILE ICON
+                      </h2>
+                      <div className="flex gap-4">
+                        <button
+                          type="button"
+                          onClick={() => handleProfileTypeToggle(false)}
+                          className={`px-4 py-2 rounded text-sm ${
+                            !useProfileImage
+                              ? 'bg-[#5ccfee] text-black font-medium'
+                              : 'bg-[#252525] text-gray-300 hover:bg-[#333]'
+                          }`}
+                        >
+                          Color Icon
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleProfileTypeToggle(true)}
+                          className={`px-4 py-2 rounded text-sm ${
+                            useProfileImage
+                              ? 'bg-[#5ccfee] text-black font-medium'
+                              : 'bg-[#252525] text-gray-300 hover:bg-[#333]'
+                          }`}
+                        >
+                          Profile Image
+                        </button>
+                      </div>
+
+                      {!useProfileImage ? (
+                        <div className="mt-4">
+                          <label className="block text-sm text-gray-400 mb-2">
+                            Profile Icon Color
+                          </label>
+                          <div className="flex items-center gap-4">
+                            <div className="relative">
+                              <input
+                                type="color"
+                                name="rawProfileColor"
+                                value={editForm.rawProfileColor || '#5ccfee'}
+                                onChange={handleColorChange}
+                                className="w-10 h-10 rounded-full overflow-hidden appearance-none cursor-pointer"
+                                style={{
+                                  opacity: 0,
+                                  position: 'absolute',
+                                  zIndex: 10,
+                                }}
+                              />
+                              <div
+                                className={`w-10 h-10 rounded-full cursor-pointer border-2 border-white`}
+                                style={{
+                                  backgroundColor: editForm.rawProfileColor,
+                                }}
+                              ></div>
+                            </div>
+                            <div className="flex-1">
+                              <div className="relative flex items-center">
+                                <span className="px-3 bg-[#1e1e1e] text-gray-400 absolute">
+                                  #
+                                </span>
+                                <input
+                                  type="text"
+                                  value={(
+                                    editForm.rawProfileColor || '#5ccfee'
+                                  ).replace('#', '')}
+                                  onChange={(e) =>
+                                    handleColorChange({
+                                      target: {
+                                        name: 'rawProfileColor',
+                                        value: `#${e.target.value}`,
+                                      },
+                                    })
+                                  }
+                                  className="bg-[#1e1e1e] text-white px-7 py-1 rounded border border-[#333] w-full focus:outline-none focus:ring-1 focus:ring-[#5ccfee]"
+                                  placeholder="Color hex code"
+                                  maxLength="6"
+                                  pattern="[0-9A-Fa-f]{6}"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-xs text-gray-400">
+                            Click on the color circle to open the color picker
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-4">
+                          <p className="text-gray-400 text-sm mb-2">
+                            You can either upload a local image or use an image
+                            URL:
+                          </p>
+                          <div className="flex flex-col space-y-4">
+                            {/* Image URL input */}
+                            <div>
+                              <label className="block text-sm text-gray-400 mb-1">
+                                Option 1: Use an Image URL
+                              </label>
+                              <input
+                                type="url"
+                                value={profileImageUrl}
+                                onChange={handleImageUrlChange}
+                                placeholder="https://example.com/your-image.jpg"
+                                className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full focus:outline-none focus:ring-1 focus:ring-[#5ccfee]"
+                              />
+                              <div className="text-xs text-gray-400 mt-1">
+                                Enter a direct link to an image file (PNG, JPG,
+                                etc.)
+                              </div>
+                            </div>
+
+                            <div className="flex items-center">
+                              <span className="text-gray-400 mr-2">OR</span>
+                              <hr className="flex-grow border-[#333]" />
+                            </div>
+
+                            {/* File upload button */}
+                            <div>
+                              <label className="block text-sm text-gray-400 mb-1">
+                                Option 2: Upload a Local Image
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="bg-[#252525] hover:bg-[#333] text-white px-4 py-2 rounded text-sm flex items-center gap-2"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-5 w-5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"
+                                  />
+                                </svg>
+                                {profileImageFile
+                                  ? 'Change Image'
+                                  : 'Choose Local Image'}
+                              </button>
+                              <div className="text-xs text-gray-400 mt-1">
+                                Select an image from your device (max 2MB)
+                              </div>
+                            </div>
+
+                            {/* Image preview */}
+                            {profileImagePreview ? (
+                              <div className="mt-2 flex items-center bg-[#252525] p-2 rounded">
+                                <div className="h-16 w-16 rounded overflow-hidden mr-2 border border-[#333]">
+                                  <img
+                                    src={profileImagePreview}
+                                    alt="Preview"
+                                    className="h-full w-full object-cover"
+                                    onError={(e) => {
+                                      console.error('Image preview error:', e)
+                                      // Don't set error on blob URLs since they're local files and should work
+                                      if (
+                                        !profileImagePreview.startsWith('blob:')
+                                      ) {
+                                        setProfileError('Invalid image URL')
+                                      } else {
+                                        console.log(
+                                          'Local blob URL should be valid, not setting error'
+                                        )
+                                      }
+                                      // Don't clear the preview for local files
+                                      if (!profileImageFile) {
+                                        setProfileImagePreview(null)
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <p className="text-green-400 text-xs font-semibold">
+                                    {profileImageFile
+                                      ? 'Local image selected'
+                                      : 'Image URL preview'}
+                                  </p>
+                                  <p className="text-gray-400 text-xs mt-1">
+                                    {profileImageFile
+                                      ? 'Your local image will be saved as a data URL'
+                                      : 'Your image URL will be saved directly'}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : userProfile?.photoURL ? (
+                              <div className="mt-2 flex items-center bg-[#252525] p-2 rounded">
+                                <div className="h-16 w-16 rounded overflow-hidden mr-2 border border-[#333]">
+                                  <img
+                                    src={userProfile.photoURL}
+                                    alt="Current"
+                                    className="h-full w-full object-cover"
+                                  />
+                                </div>
+                                <div>
+                                  <p className="text-gray-400 text-xs">
+                                    Current profile image
+                                  </p>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                          {/* Hidden file input */}
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleProfileImageChange}
+                          />
+                        </div>
+                      )}
                     </div>
 
-                    {useProfileImage ? (
-                      <div className="mt-4">
-                        <p className="text-gray-400 text-sm mb-2">
-                          You can either upload a local image or use an image
-                          URL:
-                        </p>
-                        <div className="flex flex-col space-y-4">
-                          {/* Image URL input */}
-                          <div>
-                            <label className="block text-sm text-gray-400 mb-1">
-                              Option 1: Use an Image URL
-                            </label>
+                    {/* Banner Color Picker - Always visible regardless of profile icon type */}
+                    <div>
+                      <h2 className="text-sm font-bold text-gray-300 mb-2">
+                        BANNER COLOR
+                      </h2>
+                      <div className="flex items-center gap-4">
+                        <div className="relative">
+                          <input
+                            type="color"
+                            name="rawBannerColor"
+                            value={editForm.rawBannerColor || '#00BFFF'}
+                            onChange={handleColorChange}
+                            className="w-10 h-10 rounded cursor-pointer appearance-none"
+                            style={{
+                              opacity: 0,
+                              position: 'absolute',
+                              zIndex: 10,
+                            }}
+                          />
+                          <div
+                            className="w-16 h-10 rounded cursor-pointer border-2 border-white"
+                            style={{
+                              background: `linear-gradient(to right, ${
+                                editForm.rawBannerColor
+                              }, ${darkenColor(editForm.rawBannerColor, 20)})`,
+                            }}
+                          ></div>
+                        </div>
+                        <div className="flex-1">
+                          <div className="relative flex items-center">
+                            <span className="px-3 bg-[#1e1e1e] text-gray-400 absolute">
+                              #
+                            </span>
                             <input
-                              type="url"
-                              value={profileImageUrl}
-                              onChange={handleImageUrlChange}
-                              placeholder="https://example.com/your-image.jpg"
-                              className="bg-[#252525] text-white px-3 py-1.5 rounded border border-[#333] w-full focus:outline-none focus:ring-1 focus:ring-[#5ccfee]"
+                              type="text"
+                              value={(
+                                editForm.rawBannerColor || '#00BFFF'
+                              ).replace('#', '')}
+                              onChange={(e) =>
+                                handleColorChange({
+                                  target: {
+                                    name: 'rawBannerColor',
+                                    value: `#${e.target.value}`,
+                                  },
+                                })
+                              }
+                              className="bg-[#1e1e1e] text-white px-7 py-1 rounded border border-[#333] w-full focus:outline-none focus:ring-1 focus:ring-[#5ccfee]"
+                              placeholder="Color hex code"
+                              maxLength="6"
+                              pattern="[0-9A-Fa-f]{6}"
                             />
-                            <div className="text-xs text-gray-400 mt-1">
-                              Enter a direct link to an image file (PNG, JPG,
-                              etc.)
-                            </div>
-                          </div>
-
-                          <div className="flex items-center">
-                            <span className="text-gray-400 mr-2">OR</span>
-                            <hr className="flex-grow border-[#333]" />
-                          </div>
-
-                          {/* File upload button */}
-                          <div>
-                            <label className="block text-sm text-gray-400 mb-1">
-                              Option 2: Upload a Local Image
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              className="bg-[#252525] hover:bg-[#333] text-white px-4 py-2 rounded text-sm flex items-center gap-2"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"
-                                />
-                              </svg>
-                              {profileImageFile
-                                ? 'Change Image'
-                                : 'Choose Local Image'}
-                            </button>
-                            <div className="text-xs text-gray-400 mt-1">
-                              Select an image from your device (max 2MB)
-                            </div>
-                          </div>
-
-                          {/* Image preview */}
-                          {profileImagePreview ? (
-                            <div className="mt-2 flex items-center bg-[#252525] p-2 rounded">
-                              <div className="h-16 w-16 rounded overflow-hidden mr-2 border border-[#333]">
-                                <img
-                                  src={profileImagePreview}
-                                  alt="Preview"
-                                  className="h-full w-full object-cover"
-                                  onError={(e) => {
-                                    console.error('Image preview error:', e)
-                                    // Don't set error on blob URLs since they're local files and should work
-                                    if (
-                                      !profileImagePreview.startsWith('blob:')
-                                    ) {
-                                      setProfileError('Invalid image URL')
-                                    } else {
-                                      console.log(
-                                        'Local blob URL should be valid, not setting error'
-                                      )
-                                    }
-                                    // Don't clear the preview for local files
-                                    if (!profileImageFile) {
-                                      setProfileImagePreview(null)
-                                    }
-                                  }}
-                                />
-                              </div>
-                              <div>
-                                <p className="text-green-400 text-xs font-semibold">
-                                  {profileImageFile
-                                    ? 'Local image selected'
-                                    : 'Image URL preview'}
-                                </p>
-                                <p className="text-gray-400 text-xs mt-1">
-                                  {profileImageFile
-                                    ? 'Your local image will be saved as a data URL'
-                                    : 'Your image URL will be saved directly'}
-                                </p>
-                              </div>
-                            </div>
-                          ) : userProfile?.photoURL ? (
-                            <div className="mt-2 flex items-center bg-[#252525] p-2 rounded">
-                              <div className="h-16 w-16 rounded overflow-hidden mr-2 border border-[#333]">
-                                <img
-                                  src={userProfile.photoURL}
-                                  alt="Current"
-                                  className="h-full w-full object-cover"
-                                  onError={(e) => {
-                                    console.error(
-                                      'Current profile image error:',
-                                      e
-                                    )
-                                    e.target.src =
-                                      'https://via.placeholder.com/150?text=Image+Error'
-                                  }}
-                                />
-                              </div>
-                              <div>
-                                <p className="text-gray-400 text-xs font-semibold">
-                                  Current profile image
-                                </p>
-                                <p className="text-gray-400 text-xs mt-1">
-                                  No changes will be made if you don't select a
-                                  new image
-                                </p>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-yellow-400 text-xs mt-2 bg-[#252525] p-2 rounded">
-                              Please enter a valid image URL or choose a local
-                              image
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      /* Show color settings when not using profile image */
-                      <div className="mt-4">
-                        <h2 className="text-sm font-bold text-gray-300 mb-2">
-                          PROFILE COLORS
-                        </h2>
-                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                          {/* Profile Logo Color Picker */}
-                          <div>
-                            <label className="block text-sm text-gray-400 mb-2">
-                              Profile Logo Color
-                            </label>
-                            <div className="flex items-center gap-4">
-                              <div className="relative">
-                                <input
-                                  type="color"
-                                  name="rawProfileColor"
-                                  value={editForm.rawProfileColor || '#5ccfee'}
-                                  onChange={handleColorChange}
-                                  className="w-10 h-10 rounded-full overflow-hidden appearance-none cursor-pointer"
-                                  style={{
-                                    opacity: 0,
-                                    position: 'absolute',
-                                    zIndex: 10,
-                                  }}
-                                />
-                                <div
-                                  className={`w-10 h-10 rounded-full cursor-pointer border-2 border-white`}
-                                  style={{
-                                    backgroundColor: editForm.rawProfileColor,
-                                  }}
-                                ></div>
-                              </div>
-                              <div className="flex-1">
-                                <div className="relative flex items-center">
-                                  <span className="px-3 bg-[#1e1e1e] text-gray-400 absolute">
-                                    #
-                                  </span>
-                                  <input
-                                    type="text"
-                                    value={(
-                                      editForm.rawProfileColor || '#5ccfee'
-                                    ).replace('#', '')}
-                                    onChange={(e) =>
-                                      handleColorChange({
-                                        target: {
-                                          name: 'rawProfileColor',
-                                          value: `#${e.target.value}`,
-                                        },
-                                      })
-                                    }
-                                    className="bg-[#1e1e1e] text-white px-7 py-1 rounded border border-[#333] w-full focus:outline-none focus:ring-1 focus:ring-[#5ccfee]"
-                                    placeholder="Color hex code"
-                                    maxLength="6"
-                                    pattern="[0-9A-Fa-f]{6}"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            <div className="mt-2 text-xs text-gray-400">
-                              Click on the color circle to open the color picker
-                            </div>
-                          </div>
-
-                          {/* Banner Color Picker */}
-                          <div>
-                            <label className="block text-sm text-gray-400 mb-2">
-                              Banner Gradient Color
-                            </label>
-                            <div className="flex items-center gap-4">
-                              <div className="relative">
-                                <input
-                                  type="color"
-                                  name="rawBannerColor"
-                                  value={editForm.rawBannerColor || '#00BFFF'}
-                                  onChange={handleColorChange}
-                                  className="w-10 h-10 rounded cursor-pointer appearance-none"
-                                  style={{
-                                    opacity: 0,
-                                    position: 'absolute',
-                                    zIndex: 10,
-                                  }}
-                                />
-                                <div
-                                  className="w-16 h-10 rounded cursor-pointer border-2 border-white"
-                                  style={{
-                                    background: `linear-gradient(to right, ${
-                                      editForm.rawBannerColor
-                                    }, ${darkenColor(
-                                      editForm.rawBannerColor,
-                                      20
-                                    )})`,
-                                  }}
-                                ></div>
-                              </div>
-                              <div className="flex-1">
-                                <div className="relative flex items-center">
-                                  <span className="px-3 bg-[#1e1e1e] text-gray-400 absolute">
-                                    #
-                                  </span>
-                                  <input
-                                    type="text"
-                                    value={(
-                                      editForm.rawBannerColor || '#00BFFF'
-                                    ).replace('#', '')}
-                                    onChange={(e) =>
-                                      handleColorChange({
-                                        target: {
-                                          name: 'rawBannerColor',
-                                          value: `#${e.target.value}`,
-                                        },
-                                      })
-                                    }
-                                    className="bg-[#1e1e1e] text-white px-7 py-1 rounded border border-[#333] w-full focus:outline-none focus:ring-1 focus:ring-[#5ccfee]"
-                                    placeholder="Color hex code"
-                                    maxLength="6"
-                                    pattern="[0-9A-Fa-f]{6}"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            <div className="mt-2 text-xs text-gray-400">
-                              A gradient will be automatically created from your
-                              selected color
-                            </div>
                           </div>
                         </div>
                       </div>
-                    )}
+                      <div className="mt-2 text-xs text-gray-400">
+                        A gradient will be automatically created from your
+                        selected color
+                      </div>
+                    </div>
                   </div>
                 )}
 

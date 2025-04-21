@@ -30,6 +30,25 @@ import { useFireStore } from '../services/firestore'
 const AuthContext = createContext()
 const googleProvider = new GoogleAuthProvider()
 
+// Function to darken a hex color
+const darkenColor = (hex, percent) => {
+  // Remove the # if present
+  hex = hex.replace('#', '')
+
+  // Parse the hex color to RGB
+  let r = parseInt(hex.substring(0, 2), 16)
+  let g = parseInt(hex.substring(2, 4), 16)
+  let b = parseInt(hex.substring(4, 6), 16)
+
+  // Darken each channel
+  r = Math.floor((r * (100 - percent)) / 100)
+  g = Math.floor((g * (100 - percent)) / 100)
+  b = Math.floor((b * (100 - percent)) / 100)
+
+  // Convert back to hex
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
+}
+
 export function useAuth() {
   return useContext(AuthContext)
 }
@@ -447,17 +466,25 @@ export function AuthProvider({ children }) {
         displayName: profileData.displayName || userData.displayName,
         username: profileData.username || userData.username,
         bio: profileData.bio !== undefined ? profileData.bio : userData.bio,
-        profileColor:
-          profileData.profileColor || userData.profileColor || 'bg-[#5ccfee]',
-        bannerColor:
-          profileData.bannerColor ||
-          userData.bannerColor ||
-          'from-[#00BFFF] to-[#5ccfee]',
+        profileColor: profileData.color
+          ? `bg-[${profileData.color}]`
+          : userData.profileColor || 'bg-[#5ccfee]',
+        bannerColor: profileData.bannerColor
+          ? `from-[${profileData.bannerColor}] to-[${darkenColor(
+              profileData.bannerColor,
+              20
+            )}]`
+          : userData.bannerColor || 'from-[#00BFFF] to-[#5ccfee]',
         // Store raw color values to ensure consistent display
         rawProfileColor:
-          profileData.rawProfileColor || userData.rawProfileColor || '#5ccfee',
+          profileData.color || userData.rawProfileColor || '#5ccfee',
         rawBannerColor:
-          profileData.rawBannerColor || userData.rawBannerColor || '#00BFFF',
+          profileData.bannerColor || userData.rawBannerColor || '#00BFFF',
+        // Store preference for using profile image
+        useProfileImage:
+          profileData.useProfileImage !== undefined
+            ? profileData.useProfileImage
+            : userData.useProfileImage || false,
         updatedAt: new Date().toISOString(),
       }
 
@@ -476,6 +503,11 @@ export function AuthProvider({ children }) {
         return {
           ...prev,
           ...profileData,
+          profileColor: updatedData.profileColor,
+          bannerColor: updatedData.bannerColor,
+          rawProfileColor: updatedData.rawProfileColor,
+          rawBannerColor: updatedData.rawBannerColor,
+          useProfileImage: updatedData.useProfileImage,
         }
       })
 
