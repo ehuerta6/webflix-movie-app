@@ -1,9 +1,9 @@
 // src/firebase/firebase.js
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { getAuth, connectAuthEmulator } from 'firebase/auth'
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 
-// Firebase configuration object
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -13,12 +13,12 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
-// Initialize Firebase app
+// Initialize Firebase
 const app = initializeApp(firebaseConfig)
 
-// Initialize and export Firebase services
-export const auth = getAuth(app)
-export const db = getFirestore(app)
+// Initialize Auth and Firestore
+const auth = getAuth(app)
+const db = getFirestore(app)
 
 // Optional: Use emulators for local development
 if (import.meta.env.MODE === 'development') {
@@ -34,7 +34,7 @@ if (import.meta.env.MODE === 'development') {
 
 console.log('Firebase initialized with authDomain:', firebaseConfig.authDomain)
 
-// Check if we're running on GitHub Pages
+// Check if we're on GitHub Pages
 const isOnGitHubPages = window.location.hostname.includes('github.io')
 if (isOnGitHubPages) {
   console.log(
@@ -42,4 +42,5 @@ if (isOnGitHubPages) {
   )
 }
 
+export { auth, db }
 export default app

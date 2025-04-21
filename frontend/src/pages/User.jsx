@@ -201,7 +201,7 @@ function User() {
           setIsProfileReady(true)
         })
     }
-  }, [currentUser?.uid, fetchUserProfile])
+  }, [currentUser?.uid])
 
   // Extract hex color from Tailwind class
   const extractColorFromClass = (colorClass) => {
