@@ -7,8 +7,7 @@ function Auth() {
   const [isLoginMode, setIsLoginMode] = useState(true)
 
   // Get auth functions from context
-  const { login, signup, loginWithGoogle, currentUser, fetchUserProfile } =
-    useAuth()
+  const { login, signup, loginWithGoogle, currentUser } = useAuth()
 
   // Redirect if already logged in
   const navigate = useNavigate()
@@ -97,8 +96,6 @@ function Auth() {
 
     try {
       await login(loginEmail, loginPassword)
-      // Immediately fetch user profile to ensure data is available in header
-      await fetchUserProfile()
       // Clear any error messages before redirecting
       setLoginError('')
       setLoginLoading(false)
@@ -123,8 +120,6 @@ function Auth() {
       setRegisterError('') // Also clear register errors
 
       await loginWithGoogle()
-      // Immediately fetch user profile to ensure data is available in header
-      await fetchUserProfile()
       // Clear any error messages before redirecting
       setLoginError('')
       setLoginLoading(false)
@@ -168,8 +163,6 @@ function Auth() {
       // Get display name from email if not provided
       const displayName = registerEmail.split('@')[0]
       await signup(registerEmail, registerPassword, displayName)
-      // Immediately fetch user profile to ensure data is available in header
-      await fetchUserProfile()
       // Clear any error messages before redirecting
       setRegisterError('')
       setRegisterLoading(false)

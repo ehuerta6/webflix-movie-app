@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import SearchBar from './components/SearchBar'
 import { useAuth } from './context/AuthContext'
 
@@ -7,17 +7,7 @@ function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const navigate = useNavigate()
-  const { currentUser, userProfile, logout, fetchUserProfile } = useAuth()
-
-  // Ensure profile data is loaded whenever Header renders with a user
-  useEffect(() => {
-    if (currentUser && !userProfile?.photoURL) {
-      // Only fetch if we don't already have photo data
-      fetchUserProfile().catch((error) => {
-        console.error('Error fetching user profile in Header:', error)
-      })
-    }
-  }, [currentUser, userProfile, fetchUserProfile])
+  const { currentUser, userProfile, logout } = useAuth()
 
   const confirmLogout = () => {
     setShowLogoutConfirm(true)
@@ -98,39 +88,21 @@ function Header() {
                 className="flex items-center gap-2 group text-sm md:text-base font-bold text-white hover:text-[#5ccfee] px-3 py-2 transition-all duration-200 hover:scale-105 cursor-pointer"
                 aria-label="Your Profile"
               >
-                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#2a2a2a] text-gray-200 group-hover:ring-2 group-hover:ring-white transition-all group-hover:text-[#5ccfee] overflow-hidden">
-                  {userProfile?.photoURL && userProfile?.useProfileImage ? (
-                    <img
-                      src={userProfile.photoURL}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
+                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#2a2a2a] text-gray-200 group-hover:ring-2 group-hover:ring-white transition-all group-hover:text-[#5ccfee]">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                     />
-                  ) : userProfile?.rawProfileColor ? (
-                    <div
-                      className="w-full h-full flex items-center justify-center text-sm font-bold text-[#1a1a1a]"
-                      style={{
-                        backgroundColor:
-                          userProfile.rawProfileColor || '#5ccfee',
-                      }}
-                    >
-                      {userProfile?.displayName?.charAt(0).toUpperCase() || 'U'}
-                    </div>
-                  ) : (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                      />
-                    </svg>
-                  )}
+                  </svg>
                 </div>
                 <span className="hidden md:block">
                   {userProfile?.displayName || 'Profile'}
