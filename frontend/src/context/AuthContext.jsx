@@ -15,7 +15,16 @@ import {
   setPersistence,
   browserSessionPersistence,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore'
+import {
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+  getDocs,
+  updateDoc,
+  deleteField,
+  serverTimestamp,
+} from 'firebase/firestore'
 import { useFireStore } from '../services/firestore'
 
 const AuthContext = createContext()
@@ -958,6 +967,125 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Updates the user's profile image by saving imageUrl to Firestore only (not Auth)
+  const uploadProfileImage = async (imageUrl) => {
+    if (!currentUser) {
+      console.error('No user is currently logged in')
+      throw new Error('No user is currently logged in')
+    }
+
+    console.log('Starting profile image update process')
+
+    // Validate URL format first to provide better error messages
+    let urlType = 'unknown'
+    if (imageUrl.startsWith('data:image/')) {
+      urlType = 'data-url'
+      console.log('Processing data URL image, length:', imageUrl.length)
+
+      // Check if data URL is too large for Firestore
+      if (imageUrl.length > 1024 * 1024) {
+        // > 1MB
+        console.error('Data URL is too large for Firestore', {
+          length: imageUrl.length,
+        })
+        throw new Error(
+          'Image is too large for storage (>1MB). Please use a smaller image or an image hosting service.'
+        )
+      }
+    } else if (
+      imageUrl.startsWith('http://') ||
+      imageUrl.startsWith('https://')
+    ) {
+      urlType = 'remote-url'
+      console.log(
+        'Processing external image URL:',
+        imageUrl.substring(0, 50) + '...'
+      )
+      // For external URLs, no size limit check needed as we're just storing the URL reference
+    } else if (imageUrl.startsWith('blob:')) {
+      urlType = 'blob-url'
+      console.error(
+        'Blob URLs cannot be stored persistently - they are temporary and browser-specific'
+      )
+      throw new Error(
+        'Cannot save blob URLs. Please use an image file or direct image URL.'
+      )
+    } else {
+      console.error(
+        'Unrecognized image URL format:',
+        imageUrl.substring(0, 30) + '...'
+      )
+      throw new Error(
+        'Invalid image URL format. Please use a direct image URL or select a local file.'
+      )
+    }
+
+    try {
+      // Update the user document in Firestore with the new image URL
+      // Store only in Firestore to avoid Auth's URL size limitations
+      const userDocRef = doc(db, 'users', currentUser.uid)
+
+      console.log(`Updating Firestore document with ${urlType}`)
+      await updateDoc(userDocRef, {
+        photoURL: imageUrl,
+        updatedAt: serverTimestamp(),
+      })
+
+      console.log('Profile image URL updated successfully in Firestore')
+
+      // Update the local profile state
+      setUserProfile((prev) => {
+        if (!prev) return { photoURL: imageUrl }
+        return { ...prev, photoURL: imageUrl }
+      })
+
+      return true
+    } catch (error) {
+      console.error('Error updating profile image:', error)
+      throw new Error(
+        'Failed to update profile image: ' + (error.message || 'Unknown error')
+      )
+    }
+  }
+
+  // Deletes the user's profile image from Firestore
+  const deleteProfileImage = async () => {
+    if (!currentUser) {
+      console.error('No user is currently logged in')
+      throw new Error('No user is currently logged in')
+    }
+
+    console.log('Starting profile image deletion process')
+
+    try {
+      // Remove the photoURL from the user document in Firestore
+      const userDocRef = doc(db, 'users', currentUser.uid)
+
+      console.log('Removing photoURL from Firestore document')
+      await updateDoc(userDocRef, {
+        photoURL: deleteField(),
+        updatedAt: serverTimestamp(),
+      })
+
+      console.log('Profile image URL removed successfully from Firestore')
+
+      // Update the local profile state
+      setUserProfile((prev) => {
+        if (!prev) return {}
+        const newProfile = { ...prev }
+        delete newProfile.photoURL
+        return newProfile
+      })
+
+      return true
+    } catch (error) {
+      console.error('Error deleting profile image:', error)
+      throw new Error(
+        'Failed to delete profile image: ' + (error.message || 'Unknown error')
+      )
+    }
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user)
@@ -986,6 +1114,8 @@ export function AuthProvider({ children }) {
     updateUserEmail,
     reauthenticate,
     updateUserProfile,
+    uploadProfileImage,
+    deleteProfileImage,
     addToWatchlist,
     removeFromWatchlist,
     addToFavorites,

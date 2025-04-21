@@ -1,7 +1,8 @@
 // src/firebase/firebase.js
 import { initializeApp } from 'firebase/app'
-import { getAuth, connectAuthEmulator } from 'firebase/auth'
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
+import { getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
+import { getStorage } from 'firebase/storage'
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -19,6 +20,7 @@ const app = initializeApp(firebaseConfig)
 // Initialize Auth and Firestore
 const auth = getAuth(app)
 const db = getFirestore(app)
+const storage = getStorage(app)
 
 // Optional: Use emulators for local development
 if (import.meta.env.MODE === 'development') {
@@ -42,5 +44,5 @@ if (isOnGitHubPages) {
   )
 }
 
-export { auth, db }
+export { auth, db, storage }
 export default app
