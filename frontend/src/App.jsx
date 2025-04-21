@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import Header from './Header'
+import Header from './components/Header'
 import Footer from './components/Footer'
 import Home from './pages/Home'
 import Details from './pages/Details'
@@ -9,7 +9,7 @@ import SearchPage from './pages/SearchPage'
 import Auth from './pages/Auth'
 import User from './pages/User'
 import ProtectedRoute from './components/ProtectedRoute'
-import './App.css'
+import './styles/main.css'
 
 function App() {
   return (

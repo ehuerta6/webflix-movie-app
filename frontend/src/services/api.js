@@ -1,7 +1,9 @@
 // API service for TMDB movie data
+import { TMDB_CONFIG } from '../utils/constants'
+import { preloadImages as preloadImagesHelper } from '../utils/helpers'
+
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY
 const BASE_URL = import.meta.env.VITE_API_BASE_URL
-const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p'
 
 /**
  * Fetch data from the TMDB API
@@ -172,27 +174,11 @@ export const fetchPersonDetails = async (id) => {
  */
 export const getTMDBImageUrl = (path, size = 'w500') => {
   if (!path) return null
-  return `${IMAGE_BASE_URL}/${size}${path}`
+  return `${TMDB_CONFIG.IMAGE_BASE_URL}/${size}${path}`
 }
 
 /**
  * Preload images for smoother UI transitions
- * @param {Array<string>} imageUrls - Array of image URLs to preload
- * @returns {Promise<void>}
+ * Wraps the helper function
  */
-export const preloadImages = (imageUrls) => {
-  if (!imageUrls || !imageUrls.length) return Promise.resolve()
-
-  const promises = imageUrls.map((url) => {
-    if (!url) return Promise.resolve()
-
-    return new Promise((resolve) => {
-      const img = new Image()
-      img.onload = () => resolve()
-      img.onerror = () => resolve() // Resolve even on error to avoid blocking
-      img.src = url
-    })
-  })
-
-  return Promise.all(promises)
-}
+export const preloadImages = preloadImagesHelper
