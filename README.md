@@ -1,8 +1,8 @@
-![Webflix Screenshot](https://github.com/user-attachments/assets/c9eed13e-103b-4f5f-98c5-db76bdab2901)
 
 # Webflix Movie App
-
 A Netflix-inspired movie and TV show browsing application built with React and Flask, featuring TMDB API integration for discovering trending content and detailed media information.
+
+![Webflix Screenshot](https://github.com/user-attachments/assets/9dc92ade-723c-4180-9057-803e2a0ffa48)
 
 ## Table of Contents
 
