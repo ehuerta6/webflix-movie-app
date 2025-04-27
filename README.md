@@ -20,6 +20,7 @@ A Netflix-inspired movie and TV show browsing application built with React and F
 - [Deployment](#deployment)
 - [Contributing](#contributing)
 - [License](#license)
+- [Recent Optimizations](#recent-optimizations)
 
 ## About
 
@@ -212,3 +213,32 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ---
 
 _Note: This project uses the TMDB API but is not endorsed or certified by TMDB._
+
+## Recent Optimizations
+
+The codebase has been optimized for better performance and maintainability:
+
+### New Reusable Components
+
+- Added common UI components (`Button`, `Card`, `IconButton`, `Spinner`)
+- Extracted reusable hooks (`useDebounce`, `useOutsideClick`)
+- Created utility functions for colors and images
+
+### Performance Improvements
+
+- Implemented `React.memo` for components that rarely change
+- Added proper dependency arrays to `useEffect` and `useCallback` hooks
+- Implemented debouncing for search inputs
+- Added lazy loading for images
+
+### Code Organization
+
+- Created proper directory structure for utilities, hooks, and common components
+- Improved imports with index files
+- Removed duplicate code and consolidated styles
+
+### Other Improvements
+
+- Added JSDoc comments for better code documentation
+- Implemented consistent error handling
+- Simplified component props with default values

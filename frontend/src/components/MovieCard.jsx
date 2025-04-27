@@ -1,5 +1,6 @@
 import { useState, memo } from 'react'
 import { Link } from 'react-router-dom'
+import Card from './common/Card'
 
 const MovieCard = memo(function MovieCard({ movie }) {
   const { id, type = 'movie', title, poster, rating, genre, year } = movie
@@ -9,11 +10,8 @@ const MovieCard = memo(function MovieCard({ movie }) {
   if (!poster) return null
 
   return (
-    <div className="relative bg-[#1e1e1e] rounded overflow-hidden h-full">
-      <Link
-        to={`/${type}/${id}`}
-        className="block hover:translate-y-[-4px] transition-transform duration-200 cursor-pointer"
-      >
+    <Card hover>
+      <Link to={`/${type}/${id}`} className="block cursor-pointer">
         <div className="aspect-[2/3] relative">
           {!imageLoaded && (
             <div className="absolute inset-0 bg-[#333] flex items-center justify-center">
@@ -47,13 +45,13 @@ const MovieCard = memo(function MovieCard({ movie }) {
             </div>
           </div>
         </div>
-        <div className="p-2">
+        <Card.Body className="p-2">
           <h3 className="text-sm text-gray-200 font-medium truncate">
             {title}
           </h3>
-        </div>
+        </Card.Body>
       </Link>
-    </div>
+    </Card>
   )
 })
 

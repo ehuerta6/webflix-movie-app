@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { fetchGenres } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import MovieCard from '../components/MovieCard'
+import { darkenColor } from '../utils/colors'
 
 // Rainbow colors array for the user to choose from
 const RAINBOW_COLORS = [
@@ -48,25 +49,6 @@ const generateGradient = (color) => {
   // Get a slightly darker variant for the gradient
   const darkerHex = darkenColor(color, 20)
   return `from-[${color}] to-[${darkerHex}]`
-}
-
-// Function to darken a hex color
-const darkenColor = (hex, percent) => {
-  // Remove the # if present
-  hex = hex.replace('#', '')
-
-  // Parse the hex color to RGB
-  let r = parseInt(hex.substring(0, 2), 16)
-  let g = parseInt(hex.substring(2, 4), 16)
-  let b = parseInt(hex.substring(4, 6), 16)
-
-  // Darken each channel
-  r = Math.floor((r * (100 - percent)) / 100)
-  g = Math.floor((g * (100 - percent)) / 100)
-  b = Math.floor((b * (100 - percent)) / 100)
-
-  // Convert back to hex
-  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
 }
 
 // GenreToggle component for selecting genres

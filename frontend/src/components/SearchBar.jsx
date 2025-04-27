@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { searchMedia } from '../services/api'
+import useDebounce from '../hooks/useDebounce'
+import useOutsideClick from '../hooks/useOutsideClick'
 
 function SearchBar({ isOpen, onClose }) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const debouncedQuery = useDebounce(searchQuery, 300)
   const [results, setResults] = useState({
     movies: [],
     shows: [],
@@ -14,19 +16,8 @@ function SearchBar({ isOpen, onClose }) {
   const [isLoading, setIsLoading] = useState(false)
   const searchRef = useRef(null)
 
-  // Close when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
-        onClose()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [onClose])
+  // Use our custom hook for outside click detection
+  useOutsideClick(searchRef, onClose)
 
   // Focus the input when opened
   useEffect(() => {
@@ -37,17 +28,6 @@ function SearchBar({ isOpen, onClose }) {
       }
     }
   }, [isOpen])
-
-  // Debounce search query
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(searchQuery)
-    }, 300)
-
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [searchQuery])
 
   // Search functionality
   useEffect(() => {
@@ -108,7 +88,12 @@ function SearchBar({ isOpen, onClose }) {
     fetchResults()
   }, [debouncedQuery])
 
-  // Check if there are any results
+  // Clear search input
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('')
+  }, [])
+
+  // Memoize the "has results" check
   const hasResults = Object.values(results).some(
     (category) => category.length > 0
   )
@@ -134,7 +119,7 @@ function SearchBar({ isOpen, onClose }) {
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={handleClearSearch}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
                 aria-label="Clear search"
               >
@@ -162,82 +147,77 @@ function SearchBar({ isOpen, onClose }) {
             <div className="divide-y divide-[#2a2a2a]">
               {/* Movies */}
               {results.movies.length > 0 && (
-                <div className="p-4">
-                  <h3 className="text-[#5ccfee] font-medium mb-2">Movies</h3>
-                  <ul className="space-y-2">
-                    {results.movies.map((movie) => (
-                      <li key={movie.id}>
-                        <Link
-                          to={`/movie/${movie.id}`}
-                          className="block p-2 hover:bg-[#1e1e1e] rounded transition-colors"
-                          onClick={onClose}
-                        >
-                          {movie.title}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <SearchResultSection
+                  title="Movies"
+                  items={results.movies}
+                  urlPrefix="/movie/"
+                  onClose={onClose}
+                />
               )}
 
               {/* TV Shows */}
               {results.shows.length > 0 && (
-                <div className="p-4">
-                  <h3 className="text-[#5ccfee] font-medium mb-2">TV Shows</h3>
-                  <ul className="space-y-2">
-                    {results.shows.map((show) => (
-                      <li key={show.id}>
-                        <Link
-                          to={`/tv/${show.id}`}
-                          className="block p-2 hover:bg-[#1e1e1e] rounded transition-colors"
-                          onClick={onClose}
-                        >
-                          {show.title}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <SearchResultSection
+                  title="TV Shows"
+                  items={results.shows}
+                  urlPrefix="/tv/"
+                  onClose={onClose}
+                />
               )}
 
               {/* Actors */}
               {results.actors.length > 0 && (
-                <div className="p-4">
-                  <h3 className="text-[#5ccfee] font-medium mb-2">People</h3>
-                  <ul className="space-y-2">
-                    {results.actors.map((actor) => (
-                      <li key={actor.id}>
-                        <Link
-                          to={`/person/${actor.id}`}
-                          className="block p-2 hover:bg-[#1e1e1e] rounded transition-colors"
-                          onClick={onClose}
-                        >
-                          {actor.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <SearchResultSection
+                  title="Actors"
+                  items={results.actors}
+                  urlPrefix="/person/"
+                  displayKey="name"
+                  onClose={onClose}
+                />
               )}
+
+              {/* View All Results button */}
+              <div className="p-4 text-center">
+                <Link
+                  to={`/search?q=${encodeURIComponent(debouncedQuery)}`}
+                  className="inline-block px-6 py-2 bg-[#1e1e1e] hover:bg-[#2a2a2a] text-[#5ccfee] rounded-md transition-colors"
+                  onClick={onClose}
+                >
+                  View All Results
+                </Link>
+              </div>
             </div>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
 
-        {/* Footer with search all button */}
-        {hasResults && (
-          <div className="p-4 border-t border-[#2a2a2a]">
+// Extracted reusable component for search result sections
+function SearchResultSection({
+  title,
+  items,
+  urlPrefix,
+  displayKey = 'title',
+  onClose,
+}) {
+  return (
+    <div className="p-4">
+      <h3 className="text-[#5ccfee] font-medium mb-2">{title}</h3>
+      <ul className="space-y-2">
+        {items.map((item) => (
+          <li key={item.id}>
             <Link
-              to={`/search?q=${encodeURIComponent(
-                debouncedQuery
-              )}&page=1&tab=all`}
-              className="block w-full py-2 px-4 bg-[#5ccfee] text-black font-medium rounded text-center hover:bg-[#4abfe0] transition-colors"
+              to={`${urlPrefix}${item.id}`}
+              className="block p-2 hover:bg-[#1e1e1e] rounded transition-colors"
               onClick={onClose}
             >
-              View all results
+              {item[displayKey]}
             </Link>
-          </div>
-        )}
-      </div>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

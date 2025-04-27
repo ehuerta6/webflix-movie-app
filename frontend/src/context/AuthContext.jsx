@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { auth, db } from '../services/firebase'
+import { darkenColor } from '../utils/colors'
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -30,24 +31,7 @@ import { useFireStore } from '../services/firestore'
 const AuthContext = createContext()
 const googleProvider = new GoogleAuthProvider()
 
-// Function to darken a hex color
-const darkenColor = (hex, percent) => {
-  // Remove the # if present
-  hex = hex.replace('#', '')
-
-  // Parse the hex color to RGB
-  let r = parseInt(hex.substring(0, 2), 16)
-  let g = parseInt(hex.substring(2, 4), 16)
-  let b = parseInt(hex.substring(4, 6), 16)
-
-  // Darken each channel
-  r = Math.floor((r * (100 - percent)) / 100)
-  g = Math.floor((g * (100 - percent)) / 100)
-  b = Math.floor((b * (100 - percent)) / 100)
-
-  // Convert back to hex
-  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
-}
+// Function to darken a hex color removed - now using imported function from utils/colors
 
 export function useAuth() {
   return useContext(AuthContext)

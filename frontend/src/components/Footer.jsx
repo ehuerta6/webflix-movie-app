@@ -1,6 +1,7 @@
-import React from 'react'
+import { memo } from 'react'
 
-function Footer() {
+// Memoizing the Footer component since it rarely changes
+const Footer = memo(function Footer() {
   const currentYear = new Date().getFullYear()
 
   return (
@@ -31,6 +32,6 @@ function Footer() {
       </div>
     </footer>
   )
-}
+})
 
 export default Footer

@@ -1,6 +1,7 @@
 // API service for movie data through our Flask backend
+import { getTMDBImageUrl, preloadImages } from '../utils/images'
+
 const BASE_URL = 'http://localhost:5000/api'
-const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p'
 
 /**
  * Fetch data from the backend API
@@ -164,47 +165,17 @@ export const fetchPersonDetails = async (id) => {
   })
 }
 
-/**
- * Generate proper TMDB image URLs
- * @param {string} path - The image path from TMDB
- * @param {string} size - The size of the image (w500, original, etc.)
- * @returns {string|null} - Full image URL or fallback image if path is invalid
- */
-export const getTMDBImageUrl = (path, size = 'w500') => {
-  if (!path) return null
-  return `${IMAGE_BASE_URL}/${size}${path}`
-}
+// Export image utilities
+export { getTMDBImageUrl, preloadImages }
 
 /**
- * Preload images for smoother UI transitions
- * @param {Array<string>} imageUrls - Array of image URLs to preload
- * @returns {Promise<void>}
- */
-export const preloadImages = (imageUrls) => {
-  if (!imageUrls || !imageUrls.length) return Promise.resolve()
-
-  const promises = imageUrls.map((url) => {
-    if (!url) return Promise.resolve()
-
-    return new Promise((resolve) => {
-      const img = new Image()
-      img.onload = () => resolve()
-      img.onerror = () => resolve() // Resolve even on error to avoid blocking
-      img.src = url
-    })
-  })
-
-  return Promise.all(promises)
-}
-
-/**
- * Check if the backend API is healthy
- * @returns {Promise<boolean>} True if the API is healthy, false otherwise
+ * Check if the API is accessible
+ * @returns {Promise<boolean>} True if the API is accessible
  */
 export const checkAPIHealth = async () => {
   try {
-    const response = await fetchFromAPI('/health')
-    return response?.status === 'healthy'
+    const response = await fetch(`${BASE_URL}/health`)
+    return response.ok
   } catch (error) {
     console.error('API health check failed:', error)
     return false
