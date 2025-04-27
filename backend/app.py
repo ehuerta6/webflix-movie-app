@@ -12,6 +12,9 @@ load_dotenv()
 TMDB_API_KEY = os.environ.get('TMDB_API_KEY')
 TMDB_BASE_URL = 'https://api.themoviedb.org/3'
 
+# For demo purposes, set a flag if we're in test mode (no API key)
+TEST_MODE = TMDB_API_KEY == 'your_tmdb_api_key_here' or not TMDB_API_KEY
+
 # Create Flask app
 app = Flask(__name__)
 CORS(app)  # Allows requests from your React frontend
@@ -19,6 +22,10 @@ CORS(app)  # Allows requests from your React frontend
 # Helper function to make TMDB API requests
 def tmdb_request(endpoint, params=None):
     """Make a request to the TMDB API"""
+    # If in test mode, return mock data
+    if TEST_MODE:
+        return get_mock_data(endpoint)
+        
     # Build URL and parameters
     url = f"{TMDB_BASE_URL}{endpoint}"
     
@@ -35,6 +42,124 @@ def tmdb_request(endpoint, params=None):
     except requests.exceptions.RequestException as e:
         print(f"TMDB API Error: {str(e)}")
         return {'error': 'Failed to fetch data from TMDB'}
+
+# Mock data function for testing without an API key
+def get_mock_data(endpoint):
+    """Return mock data based on the endpoint"""
+    if '/trending/' in endpoint:
+        return {
+            "page": 1,
+            "results": [
+                {
+                    "id": 1,
+                    "title": "Test Movie 1",
+                    "poster_path": "/test-poster-1.jpg",
+                    "backdrop_path": "/test-backdrop-1.jpg",
+                    "overview": "This is a test movie for demonstration purposes.",
+                    "release_date": "2023-01-01",
+                    "vote_average": 8.5
+                },
+                {
+                    "id": 2,
+                    "title": "Test Movie 2",
+                    "poster_path": "/test-poster-2.jpg",
+                    "backdrop_path": "/test-backdrop-2.jpg",
+                    "overview": "Another test movie for demonstration purposes.",
+                    "release_date": "2023-02-01",
+                    "vote_average": 7.9
+                }
+            ],
+            "total_pages": 1,
+            "total_results": 2
+        }
+    elif '/movie/' in endpoint:
+        return {
+            "id": 1,
+            "title": "Test Movie Details",
+            "poster_path": "/test-poster-1.jpg",
+            "backdrop_path": "/test-backdrop-1.jpg",
+            "overview": "Detailed information about this test movie.",
+            "release_date": "2023-01-01",
+            "vote_average": 8.5,
+            "genres": [{"id": 28, "name": "Action"}, {"id": 12, "name": "Adventure"}],
+            "credits": {
+                "cast": [
+                    {"id": 101, "name": "Actor One", "profile_path": "/actor1.jpg"},
+                    {"id": 102, "name": "Actor Two", "profile_path": "/actor2.jpg"}
+                ]
+            },
+            "similar": {"results": []},
+            "videos": {"results": []}
+        }
+    elif '/tv/' in endpoint:
+        return {
+            "id": 3,
+            "name": "Test TV Show",
+            "poster_path": "/test-tv-poster.jpg",
+            "backdrop_path": "/test-tv-backdrop.jpg",
+            "overview": "This is a test TV show.",
+            "first_air_date": "2023-03-01",
+            "vote_average": 8.0,
+            "genres": [{"id": 18, "name": "Drama"}],
+            "credits": {
+                "cast": [
+                    {"id": 103, "name": "TV Actor", "profile_path": "/tv-actor.jpg"}
+                ]
+            },
+            "similar": {"results": []},
+            "videos": {"results": []}
+        }
+    elif '/discover/' in endpoint:
+        return {
+            "page": 1,
+            "results": [
+                {
+                    "id": 4,
+                    "title": "Discovered Movie",
+                    "poster_path": "/discovered-poster.jpg",
+                    "backdrop_path": "/discovered-backdrop.jpg",
+                    "overview": "A movie found through discover API.",
+                    "release_date": "2023-04-01",
+                    "vote_average": 7.2
+                }
+            ],
+            "total_pages": 1,
+            "total_results": 1
+        }
+    elif '/genre/' in endpoint:
+        return {
+            "genres": [
+                {"id": 28, "name": "Action"},
+                {"id": 12, "name": "Adventure"},
+                {"id": 16, "name": "Animation"},
+                {"id": 35, "name": "Comedy"},
+                {"id": 80, "name": "Crime"},
+                {"id": 99, "name": "Documentary"},
+                {"id": 18, "name": "Drama"},
+                {"id": 10751, "name": "Family"},
+                {"id": 14, "name": "Fantasy"},
+                {"id": 36, "name": "History"}
+            ]
+        }
+    elif '/search/' in endpoint:
+        return {
+            "page": 1,
+            "results": [
+                {
+                    "id": 5,
+                    "title": "Search Result",
+                    "poster_path": "/search-poster.jpg",
+                    "backdrop_path": "/search-backdrop.jpg",
+                    "overview": "A result from search API.",
+                    "release_date": "2023-05-01",
+                    "vote_average": 6.8
+                }
+            ],
+            "total_pages": 1,
+            "total_results": 1
+        }
+    else:
+        return {"results": []}
 
 # Route for getting trending movies and shows
 @app.route("/api/trending/<media_type>/<time_window>")
@@ -160,6 +285,13 @@ def get_movies():
 @app.route("/api/health")
 def health_check():
     """Check if the API is running and can connect to TMDB"""
+    # In test mode, always return healthy
+    if TEST_MODE:
+        return jsonify({
+            "status": "healthy",
+            "message": "Webflix API is running in test mode with mock data"
+        })
+        
     if not TMDB_API_KEY:
         return jsonify({
             "status": "error",

@@ -1,5 +1,5 @@
-
 # Webflix Movie App
+
 A Netflix-inspired movie and TV show browsing application built with React and Flask, featuring TMDB API integration for discovering trending content and detailed media information.
 
 ![Webflix Screenshot](https://github.com/user-attachments/assets/9dc92ade-723c-4180-9057-803e2a0ffa48)
@@ -14,6 +14,8 @@ A Netflix-inspired movie and TV show browsing application built with React and F
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
 - [Usage](#usage)
+  - [Using the Combined Dev Script](#using-the-combined-dev-script)
+  - [Running Separately](#running-separately)
 - [API Endpoints](#api-endpoints)
 - [Deployment](#deployment)
 - [Contributing](#contributing)
@@ -93,12 +95,15 @@ This separation allows for:
 
    ```
    cd backend
-   # Create a virtual environment (optional but recommended)
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-   # Install dependencies
-   pip install -r requirements.txt
+   # Run the setup script
+   python setup.py
+
+   # Activate the virtual environment
+   # On Windows:
+   venv\Scripts\activate
+   # On Unix/MacOS:
+   source venv/bin/activate
 
    # Create .env file with your TMDB API key
    echo "TMDB_API_KEY=your_api_key_here" > .env
@@ -112,21 +117,47 @@ This separation allows for:
 
 ## Usage
 
-1. Start the backend server:
+### Using the Combined Dev Script
 
-   ```
-   cd backend
-   python app.py
-   ```
+For convenience, we've included a script to run both the frontend and backend together:
 
-2. Start the frontend development server:
+```
+# From the project root
+node start-dev.js
+```
 
-   ```
-   cd frontend
-   npm run dev
-   ```
+This will start both servers:
 
-3. Open your browser and navigate to `http://localhost:5173`
+- Backend: http://localhost:5000
+- Frontend: http://localhost:5173
+
+### Running Separately
+
+#### 1. Start the backend server:
+
+```
+cd backend
+
+# Activate the virtual environment if not already activated
+# On Windows:
+venv\Scripts\activate
+# On Unix/MacOS:
+source venv/bin/activate
+
+# Run the Flask app
+flask run
+```
+
+The backend will be available at http://localhost:5000
+
+#### 2. Start the frontend development server:
+
+```
+cd frontend
+npm run dev
+```
+
+The frontend will be available at http://localhost:5173
 
 ## API Endpoints
 
@@ -149,6 +180,7 @@ The backend provides the following API endpoints:
 The frontend is deployed using GitHub Pages:
 
 ```
+cd frontend
 npm run deploy
 ```
 
@@ -162,6 +194,8 @@ The backend can be deployed to any Python-compatible hosting service like:
 - PythonAnywhere
 - AWS Lambda
 - Google Cloud Functions
+
+For deployment, make sure to set the `TMDB_API_KEY` environment variable on your hosting service.
 
 ## Contributing
 

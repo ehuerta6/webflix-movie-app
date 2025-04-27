@@ -1,0 +1,17 @@
+{
+  "name": "webflix-movie-webapp-root",
+  "version": "1.0.0",
+  "description": "Root package for Webflix Movie App with Flask backend and React frontend",
+  "private": true,
+  "scripts": {
+    "dev": "node start-dev.js",
+    "setup-backend": "cd backend && python setup.py",
+    "setup-frontend": "cd frontend && npm install",
+    "setup": "npm run setup-backend && npm run setup-frontend",
+    "start-backend": "cd backend && flask run",
+    "start-frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build"
+  },
+  "author": "",
+  "license": "MIT"
+}
