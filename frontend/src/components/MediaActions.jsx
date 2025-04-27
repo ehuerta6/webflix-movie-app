@@ -1,14 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { Spinner } from './common'
 
 /**
  * MediaActions component displays buttons for adding content to watchlist, favorites, and marking as watched
  * @param {Object} props
  * @param {Object} props.mediaData - The movie or TV show data
  * @param {Object} props.collectionStatus - Optional object containing current collection status
+ * @param {Function} props.onActionComplete - Optional callback that fires when an action completes
  */
-function MediaActions({ mediaData, collectionStatus }) {
+const MediaActions = memo(function MediaActions({
+  mediaData,
+  collectionStatus,
+  onActionComplete,
+}) {
   const {
     currentUser,
     userProfile,
@@ -20,11 +26,14 @@ function MediaActions({ mediaData, collectionStatus }) {
     removeFromWatched,
   } = useAuth()
   const navigate = useNavigate()
+
+  // State for loading indicators and action states
   const [isLoading, setIsLoading] = useState({
     watchlist: false,
     favorites: false,
     watched: false,
   })
+
   const [actionStates, setActionStates] = useState({
     watchlistSuccess: false,
     favoritesSuccess: false,
@@ -33,13 +42,392 @@ function MediaActions({ mediaData, collectionStatus }) {
   })
 
   // Initialize local state based on props or userProfile
+  // This avoids re-renders when parent components change by keeping state locally
   const [localCollectionStatus, setLocalCollectionStatus] = useState({
     isInWatchlist: false,
     isInFavorites: false,
     isWatched: false,
   })
 
-  // Update local state when props or userProfile changes
+  // Clear success state after delay
+  const clearSuccessState = useCallback((key) => {
+    setTimeout(() => {
+      setActionStates((prev) => ({ ...prev, [key]: false }))
+    }, 3000)
+  }, [])
+
+  // Handle adding to watchlist with optimistic updates
+  const handleWatchlist = useCallback(async () => {
+    if (!currentUser) {
+      navigate('/login')
+      return
+    }
+
+    setIsLoading((prev) => ({ ...prev, watchlist: true }))
+    setActionStates((prev) => ({ ...prev, watchlistSuccess: false, error: '' }))
+
+    try {
+      // Optimistic update - update UI immediately
+      const newStatus = !localCollectionStatus.isInWatchlist
+      setLocalCollectionStatus((prev) => ({
+        ...prev,
+        isInWatchlist: newStatus,
+      }))
+
+      if (!newStatus) {
+        // Remove from watchlist
+        await removeFromWatchlist(mediaData.id, mediaData.media_type || 'movie')
+      } else {
+        // Add to watchlist
+        await addToWatchlist(
+          currentUser.uid,
+          mediaData.id,
+          JSON.stringify(mediaData)
+        )
+
+        // Only show success state when adding to watchlist
+        setActionStates((prev) => ({ ...prev, watchlistSuccess: true }))
+        clearSuccessState('watchlistSuccess')
+      }
+
+      // Notify parent component if callback provided
+      if (onActionComplete) {
+        onActionComplete({
+          type: 'watchlist',
+          added: newStatus,
+          mediaId: mediaData.id,
+          mediaType: mediaData.media_type || 'movie',
+        })
+      }
+    } catch (error) {
+      console.error('Watchlist action failed:', error)
+
+      // Rollback optimistic update if operation failed
+      setLocalCollectionStatus((prev) => ({
+        ...prev,
+        isInWatchlist: !localCollectionStatus.isInWatchlist,
+      }))
+
+      setActionStates((prev) => ({
+        ...prev,
+        error: 'Failed to update watchlist',
+      }))
+    } finally {
+      setIsLoading((prev) => ({ ...prev, watchlist: false }))
+    }
+  }, [
+    currentUser,
+    navigate,
+    localCollectionStatus.isInWatchlist,
+    addToWatchlist,
+    removeFromWatchlist,
+    mediaData,
+    clearSuccessState,
+    onActionComplete,
+  ])
+
+  // Handle adding to favorites with optimistic updates
+  const handleFavorites = useCallback(async () => {
+    if (!currentUser) {
+      navigate('/login')
+      return
+    }
+
+    setIsLoading((prev) => ({ ...prev, favorites: true }))
+    setActionStates((prev) => ({ ...prev, favoritesSuccess: false, error: '' }))
+
+    try {
+      // Optimistic update - update UI immediately
+      const newStatus = !localCollectionStatus.isInFavorites
+      setLocalCollectionStatus((prev) => ({
+        ...prev,
+        isInFavorites: newStatus,
+      }))
+
+      if (!newStatus) {
+        // Remove from favorites
+        await removeFromFavorites(mediaData.id, mediaData.media_type || 'movie')
+      } else {
+        // Add to favorites
+        await addToFavorites(
+          currentUser.uid,
+          mediaData.id,
+          JSON.stringify(mediaData)
+        )
+
+        // Only show success state when adding to favorites
+        setActionStates((prev) => ({ ...prev, favoritesSuccess: true }))
+        clearSuccessState('favoritesSuccess')
+      }
+
+      // Notify parent component if callback provided
+      if (onActionComplete) {
+        onActionComplete({
+          type: 'favorites',
+          added: newStatus,
+          mediaId: mediaData.id,
+          mediaType: mediaData.media_type || 'movie',
+        })
+      }
+    } catch (error) {
+      console.error('Favorites action failed:', error)
+
+      // Rollback optimistic update if operation failed
+      setLocalCollectionStatus((prev) => ({
+        ...prev,
+        isInFavorites: !localCollectionStatus.isInFavorites,
+      }))
+
+      setActionStates((prev) => ({
+        ...prev,
+        error: 'Failed to update favorites',
+      }))
+    } finally {
+      setIsLoading((prev) => ({ ...prev, favorites: false }))
+    }
+  }, [
+    currentUser,
+    navigate,
+    localCollectionStatus.isInFavorites,
+    addToFavorites,
+    removeFromFavorites,
+    mediaData,
+    clearSuccessState,
+    onActionComplete,
+  ])
+
+  // Handle marking as watched with optimistic updates
+  const handleWatched = useCallback(async () => {
+    if (!currentUser) {
+      navigate('/login')
+      return
+    }
+
+    setIsLoading((prev) => ({ ...prev, watched: true }))
+    setActionStates((prev) => ({ ...prev, watchedSuccess: false, error: '' }))
+
+    try {
+      // Optimistic update - update UI immediately
+      const newStatus = !localCollectionStatus.isWatched
+      setLocalCollectionStatus((prev) => ({
+        ...prev,
+        isWatched: newStatus,
+      }))
+
+      if (!newStatus) {
+        // Remove from watched
+        await removeFromWatched(mediaData.id, mediaData.media_type || 'movie')
+      } else {
+        // Add to watched
+        await addToWatched(
+          currentUser.uid,
+          mediaData.id,
+          JSON.stringify(mediaData)
+        )
+
+        // Only show success state when adding to watched
+        setActionStates((prev) => ({ ...prev, watchedSuccess: true }))
+        clearSuccessState('watchedSuccess')
+      }
+
+      // Notify parent component if callback provided
+      if (onActionComplete) {
+        onActionComplete({
+          type: 'watched',
+          added: newStatus,
+          mediaId: mediaData.id,
+          mediaType: mediaData.media_type || 'movie',
+        })
+      }
+    } catch (error) {
+      console.error('Watched action failed:', error)
+
+      // Rollback optimistic update if operation failed
+      setLocalCollectionStatus((prev) => ({
+        ...prev,
+        isWatched: !localCollectionStatus.isWatched,
+      }))
+
+      setActionStates((prev) => ({
+        ...prev,
+        error: 'Failed to update watched status',
+      }))
+    } finally {
+      setIsLoading((prev) => ({ ...prev, watched: false }))
+    }
+  }, [
+    currentUser,
+    navigate,
+    localCollectionStatus.isWatched,
+    addToWatched,
+    removeFromWatched,
+    mediaData,
+    clearSuccessState,
+    onActionComplete,
+  ])
+
+  // Memoized button rendering - better than creating DOM nodes each render
+  const WatchlistButton = useCallback(
+    () => (
+      <button
+        onClick={handleWatchlist}
+        disabled={isLoading.watchlist}
+        className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          actionStates.watchlistSuccess
+            ? 'bg-purple-600 text-white'
+            : localCollectionStatus.isInWatchlist
+            ? 'bg-[#2a2a2a] text-white border border-[#5ccfee]'
+            : 'bg-[#1e1e1e] text-white hover:bg-[#2a2a2a]'
+        }`}
+      >
+        {isLoading.watchlist ? (
+          <Spinner size="sm" color="secondary" />
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+        )}
+        <span>
+          {localCollectionStatus.isInWatchlist
+            ? 'In Watchlist'
+            : 'Add to Watchlist'}
+        </span>
+      </button>
+    ),
+    [
+      handleWatchlist,
+      isLoading.watchlist,
+      actionStates.watchlistSuccess,
+      localCollectionStatus.isInWatchlist,
+    ]
+  )
+
+  // Memoized button rendering - better than creating DOM nodes each render
+  const FavoritesButton = useCallback(
+    () => (
+      <button
+        onClick={handleFavorites}
+        disabled={isLoading.favorites}
+        className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          actionStates.favoritesSuccess
+            ? 'bg-pink-600 text-white'
+            : localCollectionStatus.isInFavorites
+            ? 'bg-[#2a2a2a] text-white border border-[#5ccfee]'
+            : 'bg-[#1e1e1e] text-white hover:bg-[#2a2a2a]'
+        }`}
+      >
+        {isLoading.favorites ? (
+          <Spinner size="sm" color="secondary" />
+        ) : localCollectionStatus.isInFavorites ? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+              clipRule="evenodd"
+            />
+          </svg>
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+            />
+          </svg>
+        )}
+        <span>{localCollectionStatus.isInFavorites ? 'Liked' : 'Like'}</span>
+      </button>
+    ),
+    [
+      handleFavorites,
+      isLoading.favorites,
+      actionStates.favoritesSuccess,
+      localCollectionStatus.isInFavorites,
+    ]
+  )
+
+  // Memoized button rendering - better than creating DOM nodes each render
+  const WatchedButton = useCallback(
+    () => (
+      <button
+        onClick={handleWatched}
+        disabled={isLoading.watched}
+        className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          actionStates.watchedSuccess
+            ? 'bg-green-600 text-white'
+            : localCollectionStatus.isWatched
+            ? 'bg-[#2a2a2a] text-white border border-[#5ccfee]'
+            : 'bg-[#1e1e1e] text-white hover:bg-[#2a2a2a]'
+        }`}
+      >
+        {isLoading.watched ? (
+          <Spinner size="sm" color="secondary" />
+        ) : localCollectionStatus.isWatched ? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        )}
+        <span>
+          {localCollectionStatus.isWatched ? 'Watched' : 'Mark as Watched'}
+        </span>
+      </button>
+    ),
+    [
+      handleWatched,
+      isLoading.watched,
+      actionStates.watchedSuccess,
+      localCollectionStatus.isWatched,
+    ]
+  )
+
+  // Update local state when props or userProfile changes (only when needed)
   useEffect(() => {
     if (collectionStatus) {
       // If collectionStatus is provided via props, use it
@@ -76,266 +464,19 @@ function MediaActions({ mediaData, collectionStatus }) {
   // Return early if user not logged in or no media data
   if (!currentUser || !mediaData) return null
 
-  // Handle adding to watchlist
-  const handleWatchlist = async () => {
-    if (!currentUser) {
-      navigate('/login')
-      return
-    }
-
-    setIsLoading((prev) => ({ ...prev, watchlist: true }))
-    setActionStates((prev) => ({ ...prev, watchlistSuccess: false, error: '' }))
-
-    try {
-      if (localCollectionStatus.isInWatchlist) {
-        // Remove from watchlist
-        await removeFromWatchlist(mediaData.id, mediaData.media_type || 'movie')
-        // Update local state immediately without showing success state
-        setLocalCollectionStatus((prev) => ({
-          ...prev,
-          isInWatchlist: false,
-        }))
-      } else {
-        // Add to watchlist
-        await addToWatchlist(
-          currentUser.uid,
-          mediaData.id,
-          JSON.stringify(mediaData)
-        )
-        // Update local state
-        setLocalCollectionStatus((prev) => ({
-          ...prev,
-          isInWatchlist: true,
-        }))
-
-        // Only show success state when adding to watchlist
-        setActionStates((prev) => ({ ...prev, watchlistSuccess: true }))
-
-        // Auto-clear success state after 3 seconds
-        setTimeout(() => {
-          setActionStates((prev) => ({ ...prev, watchlistSuccess: false }))
-        }, 3000)
-      }
-    } catch (error) {
-      console.error('Watchlist action failed:', error)
-      setActionStates((prev) => ({
-        ...prev,
-        error: 'Failed to update watchlist',
-      }))
-    } finally {
-      setIsLoading((prev) => ({ ...prev, watchlist: false }))
-    }
-  }
-
-  // Handle adding to favorites
-  const handleFavorites = async () => {
-    if (!currentUser) {
-      navigate('/login')
-      return
-    }
-
-    setIsLoading((prev) => ({ ...prev, favorites: true }))
-    setActionStates((prev) => ({ ...prev, favoritesSuccess: false, error: '' }))
-
-    try {
-      if (localCollectionStatus.isInFavorites) {
-        // Remove from favorites
-        await removeFromFavorites(mediaData.id, mediaData.media_type || 'movie')
-        // Update local state immediately without showing success state
-        setLocalCollectionStatus((prev) => ({
-          ...prev,
-          isInFavorites: false,
-        }))
-      } else {
-        // Add to favorites
-        await addToFavorites(
-          currentUser.uid,
-          mediaData.id,
-          JSON.stringify(mediaData)
-        )
-        // Update local state
-        setLocalCollectionStatus((prev) => ({
-          ...prev,
-          isInFavorites: true,
-        }))
-
-        // Only show success state when adding to favorites
-        setActionStates((prev) => ({ ...prev, favoritesSuccess: true }))
-
-        // Auto-clear success state after 3 seconds
-        setTimeout(() => {
-          setActionStates((prev) => ({ ...prev, favoritesSuccess: false }))
-        }, 3000)
-      }
-    } catch (error) {
-      console.error('Favorites action failed:', error)
-      setActionStates((prev) => ({
-        ...prev,
-        error: 'Failed to update favorites',
-      }))
-    } finally {
-      setIsLoading((prev) => ({ ...prev, favorites: false }))
-    }
-  }
-
-  // Handle marking as watched
-  const handleWatched = async () => {
-    if (!currentUser) {
-      navigate('/login')
-      return
-    }
-
-    setIsLoading((prev) => ({ ...prev, watched: true }))
-    setActionStates((prev) => ({ ...prev, watchedSuccess: false, error: '' }))
-
-    try {
-      if (localCollectionStatus.isWatched) {
-        // Remove from watched
-        await removeFromWatched(mediaData.id, mediaData.media_type || 'movie')
-        // Update local state immediately without showing success state
-        setLocalCollectionStatus((prev) => ({
-          ...prev,
-          isWatched: false,
-        }))
-      } else {
-        // Add to watched
-        await addToWatched(
-          currentUser.uid,
-          mediaData.id,
-          JSON.stringify(mediaData)
-        )
-        // Update local state
-        setLocalCollectionStatus((prev) => ({
-          ...prev,
-          isWatched: true,
-        }))
-
-        // Only show success state when adding to watched
-        setActionStates((prev) => ({ ...prev, watchedSuccess: true }))
-
-        // Auto-clear success state after 3 seconds
-        setTimeout(() => {
-          setActionStates((prev) => ({ ...prev, watchedSuccess: false }))
-        }, 3000)
-      }
-    } catch (error) {
-      console.error('Watched action failed:', error)
-      setActionStates((prev) => ({
-        ...prev,
-        error: 'Failed to update watched status',
-      }))
-    } finally {
-      setIsLoading((prev) => ({ ...prev, watched: false }))
-    }
-  }
-
   return (
     <div>
       <div className="flex flex-wrap gap-3">
-        {/* Watchlist Button */}
-        <button
-          onClick={handleWatchlist}
-          disabled={isLoading.watchlist}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            actionStates.watchlistSuccess
-              ? 'bg-purple-600 text-white'
-              : localCollectionStatus.isInWatchlist
-              ? 'bg-[#2a2a2a] text-white border border-[#5ccfee]'
-              : 'bg-[#1e1e1e] text-white hover:bg-[#2a2a2a]'
-          }`}
-        >
-          {isLoading.watchlist ? (
-            <span className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
-            </svg>
-          )}
-          {localCollectionStatus.isInWatchlist
-            ? 'In Watchlist'
-            : 'Add to Watchlist'}
-        </button>
-
-        {/* Favorites Button */}
-        <button
-          onClick={handleFavorites}
-          disabled={isLoading.favorites}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            actionStates.favoritesSuccess
-              ? 'bg-red-600 text-white'
-              : localCollectionStatus.isInFavorites
-              ? 'bg-[#2a2a2a] text-red-500 border border-red-500'
-              : 'bg-[#1e1e1e] text-white hover:bg-[#2a2a2a]'
-          }`}
-        >
-          {isLoading.favorites ? (
-            <span className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill={
-                localCollectionStatus.isInFavorites ? 'currentColor' : 'none'
-              }
-              stroke="currentColor"
-              strokeWidth={localCollectionStatus.isInFavorites ? '0' : '2'}
-            >
-              <path
-                fillRule="evenodd"
-                d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-                clipRule="evenodd"
-              />
-            </svg>
-          )}
-          {localCollectionStatus.isInFavorites
-            ? 'Favorite'
-            : 'Add to Favorites'}
-        </button>
-
-        {/* Watched Button */}
-        <button
-          onClick={handleWatched}
-          disabled={isLoading.watched}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            actionStates.watchedSuccess
-              ? 'bg-green-600 text-white'
-              : localCollectionStatus.isWatched
-              ? 'bg-[#2a2a2a] text-[#5ccfee] border border-[#5ccfee]'
-              : 'bg-[#1e1e1e] text-white hover:bg-[#2a2a2a]'
-          }`}
-        >
-          {isLoading.watched ? (
-            <span className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clipRule="evenodd"
-              />
-            </svg>
-          )}
-          {localCollectionStatus.isWatched ? 'Watched' : 'Mark as Watched'}
-        </button>
+        <WatchlistButton />
+        <FavoritesButton />
+        <WatchedButton />
       </div>
 
-      {/* Error Message */}
       {actionStates.error && (
-        <p className="text-red-500 text-sm mt-2">{actionStates.error}</p>
+        <div className="mt-2 text-red-500 text-sm">{actionStates.error}</div>
       )}
     </div>
   )
-}
+})
 
 export default MediaActions
