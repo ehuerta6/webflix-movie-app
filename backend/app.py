@@ -13,7 +13,7 @@ TMDB_API_KEY = os.environ.get('TMDB_API_KEY')
 TMDB_BASE_URL = 'https://api.themoviedb.org/3'
 
 # For demo purposes, set a flag if we're in test mode (no API key)
-TEST_MODE = TMDB_API_KEY == 'your_tmdb_api_key_here' or not TMDB_API_KEY
+TEST_MODE = False  # Always use the real API
 
 # Create Flask app
 app = Flask(__name__)
