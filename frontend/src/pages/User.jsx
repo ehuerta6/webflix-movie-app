@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { fetchGenres } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -238,269 +238,133 @@ function User() {
   // Add state for profile image URL input
   const [profileImageUrl, setProfileImageUrl] = useState('')
 
-  // Calculate user statistics
-  useEffect(() => {
-    if (userProfile) {
-      const favorites = userProfile.favorites || []
-      const watchlist = userProfile.watchlist || []
-      const watched = userProfile.watched || []
+  // Helper function to extract genre from various possible formats
+  const extractGenre = useCallback((movie) => {
+    let genre = undefined // No default genre
 
-      // Only calculate counts needed for our stats display
-      const movieWatched = watched.filter(
-        (item) => item.type === 'movie'
-      ).length
-      const showWatched = watched.filter((item) => item.type === 'tv').length
+    console.log('Extracting genre from movie:', movie.id || 'unknown')
 
-      setUserStats({
-        totalWatched: movieWatched + showWatched,
-        favoriteCount: favorites.length,
-        watchlistCount: watchlist.length,
-      })
-    }
-  }, [userProfile])
-
-  // Fetch user profile on mount and when user changes
-  useEffect(() => {
-    if (currentUser?.uid) {
-      setLoading((prev) => ({ ...prev, profile: true }))
-      fetchUserProfile()
-        .then(() => {
-          setLoading((prev) => ({ ...prev, profile: false }))
-          setIsProfileReady(true)
-        })
-        .catch(() => {
-          setLoading((prev) => ({ ...prev, profile: false }))
-          setIsProfileReady(true)
-        })
-    }
-  }, [currentUser?.uid])
-
-  // Extract hex color from Tailwind class
-  const extractColorFromClass = (colorClass) => {
-    if (!colorClass) return DEFAULT_PROFILE_COLOR
-    // Extract hex color from classes like bg-[#color] or from-[#color]
-    const match = colorClass.match(/\[(#[0-9A-Fa-f]{6})\]/)
-    return match ? match[1] : DEFAULT_PROFILE_COLOR
-  }
-
-  // Initialize form data when userProfile changes
-  useEffect(() => {
-    if (isEditingProfile) {
-      // Extract raw colors from Tailwind classes if they exist
-      const profileRawColor =
-        extractColorFromClass(userProfile?.profileColor) ||
-        DEFAULT_PROFILE_COLOR
-      const bannerRawColor =
-        extractColorFromClass(userProfile?.bannerColor) || DEFAULT_BANNER_COLOR
-
-      // Check if user has a profile image
-      const hasProfileImage = !!userProfile?.photoURL
-
-      setEditForm({
-        name: userProfile?.displayName || '',
-        username: userProfile?.username || '',
-        bio: userProfile?.bio || '',
-        selectedGenres: userProfile?.favoriteGenres || [],
-        profileColor:
-          userProfile?.profileColor || colorToTailwindBg(DEFAULT_PROFILE_COLOR),
-        bannerColor:
-          userProfile?.bannerColor || generateGradient(DEFAULT_BANNER_COLOR),
-        rawProfileColor: profileRawColor,
-        rawBannerColor: bannerRawColor,
-        useProfileImage: hasProfileImage,
-      })
-
-      // Set the profile image preview if available
-      if (hasProfileImage) {
-        setProfileImagePreview(userProfile.photoURL)
-        setUseProfileImage(true)
-      } else {
-        setProfileImagePreview(null)
-        setUseProfileImage(false)
-      }
+    // Check for _directGenre which is our preprocessed value for reliable genre
+    if (movie._directGenre) {
+      genre = movie._directGenre
+      console.log('Using preprocessed _directGenre property:', genre)
+      return genre
     }
 
-    if (userProfile) {
-      setSettingsForm((prev) => ({
-        ...prev,
-        email: userProfile.email || '',
-      }))
-    }
-  }, [userProfile, isEditingProfile])
-
-  // Load genre data for mapping IDs to names
-  useEffect(() => {
-    const loadGenres = async () => {
-      setLoading((prev) => ({ ...prev, genres: true }))
-      try {
-        // Fetch movie and TV genres
-        const [movieGenres, tvGenres] = await Promise.all([
-          fetchGenres('movie'),
-          fetchGenres('tv'),
-        ])
-
-        // Create genre list
-        const genreNames = new Set()
-
-        // Add movie genres to list
-        movieGenres.forEach((genre) => {
-          genreNames.add(genre.name)
-        })
-
-        // Add TV genres to list (some may overlap)
-        tvGenres.forEach((genre) => {
-          genreNames.add(genre.name)
-        })
-
-        setAvailableGenres([...genreNames].sort())
-      } catch (error) {
-        console.error('Error fetching genres:', error)
-      } finally {
-        setLoading((prev) => ({ ...prev, genres: false }))
-      }
+    // Try the direct genre property next as it's most reliable
+    if (movie.genre && typeof movie.genre === 'string') {
+      genre = movie.genre
+      console.log('Found direct genre property:', genre)
+      return genre
     }
 
-    loadGenres()
-  }, [])
+    // Next check for hasGenreIds flag or direct genre_ids
+    if (
+      (movie.hasGenreIds || movie.genre_ids) &&
+      Array.isArray(movie.genre_ids) &&
+      movie.genre_ids.length > 0
+    ) {
+      // In a real app, we would map these IDs to names using a genre map
+      // For now, just indicate we found the genre ID
+      genre = `Genre ${movie.genre_ids[0]}`
+      console.log('Using genre from genre_ids:', genre)
+      return genre
+    }
 
-  // Load user watchlist and favorites from profile data with improved Firestore compatibility
-  useEffect(() => {
-    if (!userProfile) return
+    // Then check if the raw data has genres property (could be from parsed JSON)
+    if (movie.genres) {
+      console.log('Movie has genres property:', typeof movie.genres)
 
-    console.log('Processing user profile data:', userProfile)
-
-    // Helper function to extract genre from various possible formats
-    const extractGenre = (movie) => {
-      let genre = undefined // No default genre
-
-      console.log('Extracting genre from movie:', movie.id || 'unknown')
-
-      // Check for _directGenre which is our preprocessed value for reliable genre
-      if (movie._directGenre) {
-        genre = movie._directGenre
-        console.log('Using preprocessed _directGenre property:', genre)
-        return genre
-      }
-
-      // Try the direct genre property next as it's most reliable
-      if (movie.genre && typeof movie.genre === 'string') {
-        genre = movie.genre
-        console.log('Found direct genre property:', genre)
-        return genre
-      }
-
-      // Next check for hasGenreIds flag or direct genre_ids
-      if (
-        (movie.hasGenreIds || movie.genre_ids) &&
-        Array.isArray(movie.genre_ids) &&
-        movie.genre_ids.length > 0
-      ) {
-        // In a real app, we would map these IDs to names using a genre map
-        // For now, just indicate we found the genre ID
-        genre = `Genre ${movie.genre_ids[0]}`
-        console.log('Using genre from genre_ids:', genre)
-        return genre
-      }
-
-      // Then check if the raw data has genres property (could be from parsed JSON)
-      if (movie.genres) {
-        console.log('Movie has genres property:', typeof movie.genres)
-
-        // Handle genres if it's already an array
-        if (Array.isArray(movie.genres)) {
-          if (movie.genres.length > 0) {
-            // Could be array of objects with name
-            if (typeof movie.genres[0] === 'object' && movie.genres[0].name) {
-              genre = movie.genres[0].name
-              console.log('Genre from array of objects:', genre)
-              return genre
-            }
-            // Or array of strings
-            else if (typeof movie.genres[0] === 'string') {
-              genre = movie.genres[0]
-              console.log('Genre from array of strings:', genre)
-              return genre
-            }
-            // Or array of numbers (genre IDs)
-            else if (typeof movie.genres[0] === 'number') {
-              genre = `Genre ${movie.genres[0]}`
-              console.log('Genre from array of numbers (IDs):', genre)
-              return genre
-            }
-          }
-        }
-        // Could be a string that needs parsing
-        else if (typeof movie.genres === 'string') {
-          // First see if it's a simple genre name
-          if (!movie.genres.includes('{') && !movie.genres.includes('[')) {
-            genre = movie.genres
-            console.log('Using genres string directly as genre:', genre)
+      // Handle genres if it's already an array
+      if (Array.isArray(movie.genres)) {
+        if (movie.genres.length > 0) {
+          // Could be array of objects with name
+          if (typeof movie.genres[0] === 'object' && movie.genres[0].name) {
+            genre = movie.genres[0].name
+            console.log('Genre from array of objects:', genre)
             return genre
           }
+          // Or array of strings
+          else if (typeof movie.genres[0] === 'string') {
+            genre = movie.genres[0]
+            console.log('Genre from array of strings:', genre)
+            return genre
+          }
+          // Or array of numbers (genre IDs)
+          else if (typeof movie.genres[0] === 'number') {
+            genre = `Genre ${movie.genres[0]}`
+            console.log('Genre from array of numbers (IDs):', genre)
+            return genre
+          }
+        }
+      }
+      // Could be a string that needs parsing
+      else if (typeof movie.genres === 'string') {
+        // First see if it's a simple genre name
+        if (!movie.genres.includes('{') && !movie.genres.includes('[')) {
+          genre = movie.genres
+          console.log('Using genres string directly as genre:', genre)
+          return genre
+        }
 
-          // Try to parse it as JSON
-          try {
-            const parsedGenres = JSON.parse(movie.genres)
-            console.log('Parsed genres from string:', typeof parsedGenres)
+        // Try to parse it as JSON
+        try {
+          const parsedGenres = JSON.parse(movie.genres)
+          console.log('Parsed genres from string:', typeof parsedGenres)
 
-            if (Array.isArray(parsedGenres)) {
-              if (parsedGenres.length > 0) {
-                if (
-                  typeof parsedGenres[0] === 'object' &&
-                  parsedGenres[0].name
-                ) {
-                  genre = parsedGenres[0].name
-                  console.log('Genre from parsed JSON object:', genre)
-                  return genre
-                } else if (typeof parsedGenres[0] === 'string') {
-                  genre = parsedGenres[0]
-                  console.log('Genre from parsed JSON string array:', genre)
-                  return genre
-                } else if (typeof parsedGenres[0] === 'number') {
-                  genre = `Genre ${parsedGenres[0]}`
-                  console.log(
-                    'Genre from parsed JSON number array (IDs):',
-                    genre
-                  )
-                  return genre
-                } else {
-                  genre = String(parsedGenres[0])
-                  console.log('Genre from generic parsed JSON:', genre)
-                  return genre
-                }
-              }
-            } else if (typeof parsedGenres === 'object') {
-              // Maybe it's a single object with a name
-              if (parsedGenres.name) {
-                genre = parsedGenres.name
-                console.log('Genre from parsed JSON single object:', genre)
+          if (Array.isArray(parsedGenres)) {
+            if (parsedGenres.length > 0) {
+              if (typeof parsedGenres[0] === 'object' && parsedGenres[0].name) {
+                genre = parsedGenres[0].name
+                console.log('Genre from parsed JSON object:', genre)
+                return genre
+              } else if (typeof parsedGenres[0] === 'string') {
+                genre = parsedGenres[0]
+                console.log('Genre from parsed JSON string array:', genre)
+                return genre
+              } else if (typeof parsedGenres[0] === 'number') {
+                genre = `Genre ${parsedGenres[0]}`
+                console.log('Genre from parsed JSON number array (IDs):', genre)
+                return genre
+              } else {
+                genre = String(parsedGenres[0])
+                console.log('Genre from generic parsed JSON:', genre)
                 return genre
               }
             }
-          } catch (error) {
-            // Not JSON, just use the string
-            console.log('Error parsing JSON genres:', error.message)
-            genre = movie.genres
-            console.log('Using raw genres string as genre:', genre)
-            return genre
+          } else if (typeof parsedGenres === 'object') {
+            // Maybe it's a single object with a name
+            if (parsedGenres.name) {
+              genre = parsedGenres.name
+              console.log('Genre from parsed JSON single object:', genre)
+              return genre
+            }
           }
+        } catch (error) {
+          // Not JSON, just use the string
+          console.log('Error parsing JSON genres:', error.message)
+          genre = movie.genres
+          console.log('Using raw genres string as genre:', genre)
+          return genre
         }
       }
-
-      // Last resort: look for other fields that might contain genre-related info
-      if (movie.type === 'movie' && typeof movie.media_type === 'string') {
-        console.log('Using media_type as genre:', movie.media_type)
-        return (
-          movie.media_type.charAt(0).toUpperCase() + movie.media_type.slice(1)
-        )
-      }
-
-      console.log('No genre found for movie')
-      return genre // Return undefined if no genre found
     }
 
-    // Helper function to format movie data consistently
-    const formatMovieData = (movie) => {
+    // Last resort: look for other fields that might contain genre-related info
+    if (movie.type === 'movie' && typeof movie.media_type === 'string') {
+      console.log('Using media_type as genre:', movie.media_type)
+      return (
+        movie.media_type.charAt(0).toUpperCase() + movie.media_type.slice(1)
+      )
+    }
+
+    console.log('No genre found for movie')
+    return genre // Return undefined if no genre found
+  }, [])
+
+  // Helper function to format movie data consistently
+  const formatMovieData = useCallback(
+    (movie) => {
       const extractedGenre = extractGenre(movie)
       console.log(
         `Formatted movie ${movie.id || 'unknown'} with genre: ${
@@ -526,7 +390,15 @@ function User() {
         type: movie.type || movie.media_type || 'movie',
         watchedAt: movie.watchedAt || null, // Only used for watched movies
       }
-    }
+    },
+    [extractGenre]
+  )
+
+  // Memoize the movie data processing function to prevent unnecessary reprocessing
+  const processUserProfileData = useCallback(() => {
+    if (!userProfile) return
+
+    console.log('Processing user profile data:', userProfile)
 
     try {
       // Format favorites data
@@ -736,7 +608,145 @@ function User() {
         watched: false,
       }))
     }
-  }, [userProfile]) // Only depend on userProfile changes
+  }, [userProfile, formatMovieData])
+
+  // Replace the large useEffect with a call to our memoized processing function
+  useEffect(() => {
+    if (userProfile) {
+      processUserProfileData()
+    }
+  }, [userProfile?.uid, processUserProfileData]) // Only run when the user ID changes or processing function changes
+
+  // Calculate user statistics
+  useEffect(() => {
+    if (userProfile) {
+      const favorites = userProfile.favorites || []
+      const watchlist = userProfile.watchlist || []
+      const watched = userProfile.watched || []
+
+      // Only calculate counts needed for our stats display
+      const movieWatched = watched.filter(
+        (item) => item.type === 'movie'
+      ).length
+      const showWatched = watched.filter((item) => item.type === 'tv').length
+
+      setUserStats({
+        totalWatched: movieWatched + showWatched,
+        favoriteCount: favorites.length,
+        watchlistCount: watchlist.length,
+      })
+    }
+  }, [userProfile])
+
+  // Fetch user profile on mount and when user changes
+  useEffect(() => {
+    if (currentUser?.uid) {
+      // Only fetch if we don't already have a complete profile
+      if (!userProfile || !isProfileReady) {
+        setLoading((prev) => ({ ...prev, profile: true }))
+        fetchUserProfile()
+          .then(() => {
+            setLoading((prev) => ({ ...prev, profile: false }))
+            setIsProfileReady(true)
+          })
+          .catch(() => {
+            setLoading((prev) => ({ ...prev, profile: false }))
+            setIsProfileReady(true)
+          })
+      } else {
+        // Profile already loaded, just set ready state
+        setIsProfileReady(true)
+      }
+    }
+  }, [currentUser?.uid, userProfile, isProfileReady, fetchUserProfile])
+
+  // Extract hex color from Tailwind class
+  const extractColorFromClass = (colorClass) => {
+    if (!colorClass) return DEFAULT_PROFILE_COLOR
+    // Extract hex color from classes like bg-[#color] or from-[#color]
+    const match = colorClass.match(/\[(#[0-9A-Fa-f]{6})\]/)
+    return match ? match[1] : DEFAULT_PROFILE_COLOR
+  }
+
+  // Initialize form data when userProfile changes
+  useEffect(() => {
+    if (isEditingProfile) {
+      // Extract raw colors from Tailwind classes if they exist
+      const profileRawColor =
+        extractColorFromClass(userProfile?.profileColor) ||
+        DEFAULT_PROFILE_COLOR
+      const bannerRawColor =
+        extractColorFromClass(userProfile?.bannerColor) || DEFAULT_BANNER_COLOR
+
+      // Check if user has a profile image
+      const hasProfileImage = !!userProfile?.photoURL
+
+      setEditForm({
+        name: userProfile?.displayName || '',
+        username: userProfile?.username || '',
+        bio: userProfile?.bio || '',
+        selectedGenres: userProfile?.favoriteGenres || [],
+        profileColor:
+          userProfile?.profileColor || colorToTailwindBg(DEFAULT_PROFILE_COLOR),
+        bannerColor:
+          userProfile?.bannerColor || generateGradient(DEFAULT_BANNER_COLOR),
+        rawProfileColor: profileRawColor,
+        rawBannerColor: bannerRawColor,
+        useProfileImage: hasProfileImage,
+      })
+
+      // Set the profile image preview if available
+      if (hasProfileImage) {
+        setProfileImagePreview(userProfile.photoURL)
+        setUseProfileImage(true)
+      } else {
+        setProfileImagePreview(null)
+        setUseProfileImage(false)
+      }
+    }
+
+    if (userProfile) {
+      setSettingsForm((prev) => ({
+        ...prev,
+        email: userProfile.email || '',
+      }))
+    }
+  }, [userProfile, isEditingProfile])
+
+  // Load genre data for mapping IDs to names
+  useEffect(() => {
+    const loadGenres = async () => {
+      setLoading((prev) => ({ ...prev, genres: true }))
+      try {
+        // Fetch movie and TV genres
+        const [movieGenres, tvGenres] = await Promise.all([
+          fetchGenres('movie'),
+          fetchGenres('tv'),
+        ])
+
+        // Create genre list
+        const genreNames = new Set()
+
+        // Add movie genres to list
+        movieGenres.forEach((genre) => {
+          genreNames.add(genre.name)
+        })
+
+        // Add TV genres to list (some may overlap)
+        tvGenres.forEach((genre) => {
+          genreNames.add(genre.name)
+        })
+
+        setAvailableGenres([...genreNames].sort())
+      } catch (error) {
+        console.error('Error fetching genres:', error)
+      } finally {
+        setLoading((prev) => ({ ...prev, genres: false }))
+      }
+    }
+
+    loadGenres()
+  }, [])
 
   // Event handlers
   const handleGoBack = () => navigate(-1)
@@ -1120,179 +1130,226 @@ function User() {
   }
 
   // Handle removing an item from watchlist with controlled reload
-  const handleRemoveFromWatchlist = async (mediaId) => {
-    try {
-      setLoading((prev) => ({ ...prev, watchlist: true }))
-      await removeFromWatchlist(mediaId, 'movie')
+  const handleRemoveFromWatchlist = useCallback(
+    async (mediaId) => {
+      try {
+        setLoading((prev) => ({ ...prev, watchlist: true }))
 
-      // Update local state without modifying userProfile directly
-      setWatchlistMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
-    } catch (error) {
-      console.error('Error removing from watchlist:', error)
-    } finally {
-      setLoading((prev) => ({ ...prev, watchlist: false }))
-    }
-  }
+        // First update the UI immediately for better user experience
+        setWatchlistMovies((prev) =>
+          prev.filter((movie) => movie.id !== mediaId)
+        )
+        setUserStats((prev) => ({
+          ...prev,
+          watchlistCount: prev.watchlistCount - 1,
+        }))
+
+        // Then make the API call without triggering a full profile reload
+        await removeFromWatchlist(mediaId, 'movie')
+      } catch (error) {
+        console.error('Error removing from watchlist:', error)
+        // On error, refetch the data to ensure UI is in sync
+        processUserProfileData()
+      } finally {
+        setLoading((prev) => ({ ...prev, watchlist: false }))
+      }
+    },
+    [removeFromWatchlist, processUserProfileData]
+  )
 
   // Handle removing an item from favorites with controlled reload
-  const handleRemoveFromFavorites = async (mediaId) => {
-    try {
-      setLoading((prev) => ({ ...prev, liked: true }))
-      await removeFromFavorites(mediaId, 'movie')
+  const handleRemoveFromFavorites = useCallback(
+    async (mediaId) => {
+      try {
+        setLoading((prev) => ({ ...prev, liked: true }))
 
-      // Update local state without modifying userProfile directly
-      setFavoritesMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
-    } catch (error) {
-      console.error('Error removing from favorites:', error)
-    } finally {
-      setLoading((prev) => ({ ...prev, liked: false }))
-    }
-  }
+        // First update the UI immediately for better user experience
+        setFavoritesMovies((prev) =>
+          prev.filter((movie) => movie.id !== mediaId)
+        )
+        setUserStats((prev) => ({
+          ...prev,
+          favoriteCount: prev.favoriteCount - 1,
+        }))
+
+        // Then make the API call without triggering a full profile reload
+        await removeFromFavorites(mediaId, 'movie')
+      } catch (error) {
+        console.error('Error removing from favorites:', error)
+        // On error, refetch the data to ensure UI is in sync
+        processUserProfileData()
+      } finally {
+        setLoading((prev) => ({ ...prev, liked: false }))
+      }
+    },
+    [removeFromFavorites, processUserProfileData]
+  )
 
   // Handle removing an item from watched with controlled reload
-  const handleRemoveFromWatched = async (mediaId) => {
-    try {
-      setLoading((prev) => ({ ...prev, watched: true }))
-      await removeFromWatched(mediaId, 'movie')
+  const handleRemoveFromWatched = useCallback(
+    async (mediaId) => {
+      try {
+        setLoading((prev) => ({ ...prev, watched: true }))
 
-      // Update local state without modifying userProfile directly
-      setWatchedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
-    } catch (error) {
-      console.error('Error removing from watched movies:', error)
-    } finally {
-      setLoading((prev) => ({ ...prev, watched: false }))
-    }
-  }
+        // First update the UI immediately for better user experience
+        setWatchedMovies((prev) => prev.filter((movie) => movie.id !== mediaId))
+        setUserStats((prev) => ({
+          ...prev,
+          totalWatched: prev.totalWatched - 1,
+        }))
 
-  // Movie collection actions
-  const collectionActions = {
-    liked: (movie) => (
-      <>
-        <button
-          className="text-[#5ccfee] hover:text-[#4ab3d3]"
-          aria-label="View details"
-          onClick={() => navigate(`/movie/${movie.id}`)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
+        // Then make the API call without triggering a full profile reload
+        await removeFromWatched(mediaId, 'movie')
+      } catch (error) {
+        console.error('Error removing from watched movies:', error)
+        // On error, refetch the data to ensure UI is in sync
+        processUserProfileData()
+      } finally {
+        setLoading((prev) => ({ ...prev, watched: false }))
+      }
+    },
+    [removeFromWatched, processUserProfileData]
+  )
+
+  // Memoize collection actions to prevent unnecessary re-renders
+  const collectionActions = useMemo(
+    () => ({
+      watchlist: (movie) => (
+        <>
+          <button
+            className="text-[#5ccfee] hover:text-[#4ab3d3]"
+            aria-label="View details"
+            onClick={() => navigate(`/movie/${movie.id}`)}
           >
-            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-            <path
-              fillRule="evenodd"
-              d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-        <button
-          className="text-red-500 hover:text-red-400"
-          aria-label="Unlike"
-          onClick={() => handleRemoveFromFavorites(movie.id)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+              <path
+                fillRule="evenodd"
+                d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+          <button
+            className="text-gray-400 hover:text-gray-300"
+            aria-label="Remove from watchlist"
+            onClick={() => handleRemoveFromWatchlist(movie.id)}
           >
-            <path
-              fillRule="evenodd"
-              d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      </>
-    ),
-    watchlist: (movie) => (
-      <>
-        <button
-          className="text-[#5ccfee] hover:text-[#4ab3d3]"
-          aria-label="View details"
-          onClick={() => navigate(`/movie/${movie.id}`)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        </>
+      ),
+      liked: (movie) => (
+        <>
+          <button
+            className="text-[#5ccfee] hover:text-[#4ab3d3]"
+            aria-label="View details"
+            onClick={() => navigate(`/movie/${movie.id}`)}
           >
-            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-            <path
-              fillRule="evenodd"
-              d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-        <button
-          className="text-gray-400 hover:text-gray-300"
-          aria-label="Remove from watchlist"
-          onClick={() => handleRemoveFromWatchlist(movie.id)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+              <path
+                fillRule="evenodd"
+                d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+          <button
+            className="text-red-500 hover:text-red-400"
+            aria-label="Unlike"
+            onClick={() => handleRemoveFromFavorites(movie.id)}
           >
-            <path
-              fillRule="evenodd"
-              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      </>
-    ),
-    watched: (movie) => (
-      <>
-        <button
-          className="text-[#5ccfee] hover:text-[#4ab3d3]"
-          aria-label="View details"
-          onClick={() => navigate(`/movie/${movie.id}`)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        </>
+      ),
+      watched: (movie) => (
+        <>
+          <button
+            className="text-[#5ccfee] hover:text-[#4ab3d3]"
+            aria-label="View details"
+            onClick={() => navigate(`/movie/${movie.id}`)}
           >
-            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-            <path
-              fillRule="evenodd"
-              d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-        <button
-          className="text-gray-400 hover:text-gray-300"
-          aria-label="Remove from watched"
-          onClick={() => handleRemoveFromWatched(movie.id)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+              <path
+                fillRule="evenodd"
+                d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+          <button
+            className="text-gray-400 hover:text-gray-300"
+            aria-label="Remove from watched"
+            onClick={() => handleRemoveFromWatched(movie.id)}
           >
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      </>
-    ),
-  }
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        </>
+      ),
+      // Include navigate as a dependency for the actions
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }),
+    [
+      navigate,
+      handleRemoveFromWatchlist,
+      handleRemoveFromFavorites,
+      handleRemoveFromWatched,
+    ]
+  )
 
   // Custom wrapper for MovieCard to support actions in user collections
-  const UserMovieCard = ({ movie, actions }) => {
+  const UserMovieCard = useCallback(({ movie, actions }) => {
     // Process the movie data to ensure proper genre display
     const processedMovie = {
       ...movie,
@@ -1374,7 +1431,7 @@ function User() {
         )}
       </div>
     )
-  }
+  }, [])
 
   // Render a movie collection section
   const MovieCollection = ({
@@ -1424,6 +1481,55 @@ function User() {
     </div>
   )
 
+  // Memoize movie collections to prevent unnecessary re-renders
+  const renderMovieCollection = useCallback(() => {
+    switch (selectedTab) {
+      case 'watchlist':
+        return (
+          <MovieCollection
+            title="My Watchlist"
+            movies={watchlistMovies}
+            actions={collectionActions.watchlist}
+            isLoading={loading.watchlist}
+            description="Movies and shows you want to watch later"
+          />
+        )
+      case 'liked':
+        return (
+          <MovieCollection
+            title="My Favorites"
+            movies={favoritesMovies}
+            actions={collectionActions.liked}
+            isLoading={loading.liked}
+            description="Movies and shows you've marked as favorites"
+          />
+        )
+      case 'watched':
+        return (
+          <MovieCollection
+            title="Watched Movies"
+            movies={watchedMovies}
+            actions={collectionActions.watched}
+            isLoading={loading.watched}
+            description="Movies and shows you've already watched"
+          />
+        )
+      default:
+        return null
+    }
+  }, [
+    selectedTab,
+    watchlistMovies,
+    favoritesMovies,
+    watchedMovies,
+    loading.watchlist,
+    loading.liked,
+    loading.watched,
+    collectionActions.watchlist,
+    collectionActions.liked,
+    collectionActions.watched,
+  ])
+
   // Handle color selection for profile and banner
   const handleColorChange = (e) => {
     const { name, value } = e.target
@@ -1463,44 +1569,6 @@ function User() {
       }
 
       setEditForm(newState)
-    }
-  }
-
-  // Function to render the selected movie collection
-  const renderMovieCollection = () => {
-    switch (selectedTab) {
-      case 'watchlist':
-        return (
-          <MovieCollection
-            title="My Watchlist"
-            movies={watchlistMovies}
-            actions={collectionActions.watchlist}
-            isLoading={loading.watchlist}
-            description="Movies and shows you want to watch later"
-          />
-        )
-      case 'liked':
-        return (
-          <MovieCollection
-            title="My Favorites"
-            movies={favoritesMovies}
-            actions={collectionActions.liked}
-            isLoading={loading.liked}
-            description="Movies and shows you've marked as favorites"
-          />
-        )
-      case 'watched':
-        return (
-          <MovieCollection
-            title="Watched Movies"
-            movies={watchedMovies}
-            actions={collectionActions.watched}
-            isLoading={loading.watched}
-            description="Movies and shows you've already watched"
-          />
-        )
-      default:
-        return null
     }
   }
 
