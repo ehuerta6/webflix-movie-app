@@ -1,20 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Link } from 'react-router-dom'
-import MovieCard from '../components/MovieCard'
+import { useState, useEffect, useCallback } from 'react'
 import { fetchTrending, fetchMovies, fetchShows } from '../services/api'
-import FeaturedMovie from '../components/FeaturedMovie'
-
-// Utility function to preload images for smoother UI
-const preloadImages = (imageUrls) => {
-  if (!imageUrls || !imageUrls.length) return
-
-  imageUrls.forEach((url) => {
-    if (url) {
-      const img = new Image()
-      img.src = url
-    }
-  })
-}
+import EnhancedFeaturedMovie from '../components/EnhancedFeaturedMovie'
+import MovieSection from '../components/MovieSection'
 
 // Helper function to validate if a movie/show has all required fields
 const isValidContent = (item) => {
@@ -37,43 +24,44 @@ const isValidContent = (item) => {
   )
 }
 
+/**
+ * Optimized Home component that doesn't re-render when featured movie changes
+ */
 function Home() {
-  // State for different movie/show categories
-  const [featured, setFeatured] = useState(null)
-  const [featuredItems, setFeaturedItems] = useState([])
-  const [currentFeaturedIndex, setCurrentFeaturedIndex] = useState(0)
+  // State for different movie/show categories - NOT for featured content
   const [popular, setPopular] = useState([])
   const [topRatedMovies, setTopRatedMovies] = useState([])
   const [topRatedShows, setTopRatedShows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const carouselTimerRef = useRef(null)
 
-  // Format movie data to be consistent with MovieCard component
-  const formatMovieData = (movie) => ({
-    id: movie.id,
-    type: movie.media_type || 'movie',
-    title: movie.title || movie.name,
-    poster: movie.poster_path
-      ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-      : null,
-    backdrop: movie.backdrop_path
-      ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
-      : null,
-    rating: movie.vote_average.toFixed(1),
-    genre: movie.genre_ids
-      ? getGenreNames(movie.genre_ids)[0] || 'Unknown'
-      : 'Unknown',
-    year:
-      movie.release_date || movie.first_air_date
-        ? (movie.release_date || movie.first_air_date).substring(0, 4)
+  // Memoized formatMovieData function
+  const formatMovieData = useCallback(
+    (movie) => ({
+      id: movie.id,
+      type: movie.media_type || 'movie',
+      title: movie.title || movie.name,
+      poster: movie.poster_path
+        ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+        : null,
+      backdrop: movie.backdrop_path
+        ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
+        : null,
+      rating: movie.vote_average.toFixed(1),
+      genre: movie.genre_ids
+        ? getGenreNames(movie.genre_ids)[0] || 'Unknown'
         : 'Unknown',
-    description: movie.overview,
-    genres: getGenreNames(movie.genre_ids),
-  })
+      year:
+        movie.release_date || movie.first_air_date
+          ? (movie.release_date || movie.first_air_date).substring(0, 4)
+          : 'Unknown',
+      description: movie.overview,
+      genres: getGenreNames(movie.genre_ids),
+    }),
+    []
+  )
 
   // Helper function to convert genre IDs to names
-  // This is a simplified version since we don't have the full genre list here
   const getGenreNames = (genreIds = []) => {
     // Common genre map (simplified)
     const genreMap = {
@@ -113,63 +101,31 @@ function Home() {
       : []
   }
 
-  // Auto-rotate featured items
-  const rotateFeatured = useCallback(() => {
-    setCurrentFeaturedIndex((prevIndex) =>
-      prevIndex === featuredItems.length - 1 ? 0 : prevIndex + 1
-    )
-  }, [featuredItems.length])
+  // Optional callback for movie actions that won't cause re-renders
+  const handleMovieAction = useCallback((actionData) => {
+    console.log('Movie action occurred:', actionData)
+    // We don't need to update state here since each MovieCardContainer
+    // manages its own state independently
+  }, [])
 
-  // Set up carousel timer
-  useEffect(() => {
-    if (featuredItems.length > 1) {
-      carouselTimerRef.current = setInterval(rotateFeatured, 8000)
-    }
-    return () => {
-      if (carouselTimerRef.current) {
-        clearInterval(carouselTimerRef.current)
-      }
-    }
-  }, [featuredItems.length, rotateFeatured])
-
-  // Function to manually change featured item
-  const changeFeaturedItem = (index) => {
-    // Reset the timer when manually changed
-    if (carouselTimerRef.current) {
-      clearInterval(carouselTimerRef.current)
-      carouselTimerRef.current = setInterval(rotateFeatured, 8000)
-    }
-    setCurrentFeaturedIndex(index)
-  }
-
-  // Fetch data from API
+  // Fetch data from API - only fetch movie sections, not featured content
   useEffect(() => {
     const fetchHomeData = async () => {
       setLoading(true)
       setError(null)
 
       try {
-        // Fetch trending content for featured section and popular section
+        // Fetch trending content for popular section
         const trendingData = await fetchTrending('all', 'week')
 
         if (trendingData.results && trendingData.results.length > 0) {
-          // Filter valid content first - require both poster and backdrop for featured items
-          const validTrendingResults = trendingData.results.filter(
-            (item) => isValidContent(item) && item.backdrop_path
-          )
+          // Filter valid content first
+          const validTrendingResults =
+            trendingData.results.filter(isValidContent)
 
           if (validTrendingResults.length > 0) {
-            // Use the first 5 valid trending items as featured content
-            const featuredItems = validTrendingResults
-              .slice(0, 5)
-              .map((item) => formatMovieData(item))
-
-            // Preload backdrop images for smoother carousel transitions
-            preloadImages(featuredItems.map((item) => item.backdrop))
-            setFeaturedItems(featuredItems)
-            setFeatured(featuredItems[0]) // Set the first item as initial featured
-
-            // Use other valid trending items for the "What's Popular" section
+            // Use trending items for the "What's Popular" section
+            // Skip the first 5 as those are used for featured content
             const formattedPopular = validTrendingResults
               .slice(5, 20) // Get more for horizontal scrolling
               .map((item) => formatMovieData(item))
@@ -211,75 +167,16 @@ function Home() {
             .slice(0, 12) // Take up to 12 valid items
           setTopRatedShows(formattedTopShows)
         }
-
-        if (error) console.error('Error fetching home page data:', error)
+      } catch (err) {
+        console.error('Error fetching home page data:', err)
+        setError('Failed to load movie data')
       } finally {
         setLoading(false)
       }
     }
 
     fetchHomeData()
-
-    // Cleanup function
-    return () => {
-      if (carouselTimerRef.current) {
-        clearInterval(carouselTimerRef.current)
-      }
-    }
-  }, []) // Run once on component mount
-
-  // Update featured item when currentFeaturedIndex changes
-  useEffect(() => {
-    if (featuredItems.length > 0) {
-      setFeatured(featuredItems[currentFeaturedIndex])
-    }
-  }, [currentFeaturedIndex, featuredItems])
-
-  // Function to go to the next item
-  const goToNext = (e) => {
-    e.preventDefault()
-    setCurrentFeaturedIndex((prevIndex) =>
-      prevIndex === featuredItems.length - 1 ? 0 : prevIndex + 1
-    )
-
-    // Reset timer
-    if (carouselTimerRef.current) {
-      clearInterval(carouselTimerRef.current)
-      carouselTimerRef.current = setInterval(rotateFeatured, 8000)
-    }
-  }
-
-  // Function to go to the previous item
-  const goToPrev = (e) => {
-    e.preventDefault()
-    setCurrentFeaturedIndex((prevIndex) =>
-      prevIndex === 0 ? featuredItems.length - 1 : prevIndex - 1
-    )
-
-    // Reset timer
-    if (carouselTimerRef.current) {
-      clearInterval(carouselTimerRef.current)
-      carouselTimerRef.current = setInterval(rotateFeatured, 8000)
-    }
-  }
-
-  // Section component for code reuse
-  const Section = ({ title, items }) => (
-    <section className="mb-10">
-      <h2 className="text-lg md:text-xl font-medium text-white mb-4 px-4 md:px-6">
-        {title}
-      </h2>
-      <div className="overflow-x-auto pb-4 -mx-4 px-4">
-        <div className="flex space-x-4" style={{ minWidth: 'max-content' }}>
-          {items.map((item) => (
-            <div key={item.id} className="w-36 md:w-40 flex-shrink-0">
-              <MovieCard movie={item} />
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
+  }, [formatMovieData]) // Only depend on formatMovieData
 
   if (loading) {
     return (
@@ -311,26 +208,35 @@ function Home() {
   return (
     <div className="bg-[#121212] min-h-screen pb-8">
       <div className="w-full mx-auto">
-        {featured && (
-          <FeaturedMovie
-            movie={featured}
-            featuredItems={featuredItems}
-            currentFeaturedIndex={currentFeaturedIndex}
-            changeFeaturedItem={changeFeaturedItem}
-            goToNext={goToNext}
-            goToPrev={goToPrev}
-          />
-        )}
+        {/* Self-contained featured movie component that manages its own state */}
+        <EnhancedFeaturedMovie />
 
         <div className="max-w-screen-2xl mx-auto">
           {popular.length > 0 && (
-            <Section title="What's Popular" items={popular} />
+            <MovieSection
+              title="What's Popular"
+              movies={popular}
+              showActions={false}
+              onMovieAction={handleMovieAction}
+            />
           )}
+
           {topRatedMovies.length > 0 && (
-            <Section title="Top Rated Movies" items={topRatedMovies} />
+            <MovieSection
+              title="Top Rated Movies"
+              movies={topRatedMovies}
+              showActions={false}
+              onMovieAction={handleMovieAction}
+            />
           )}
+
           {topRatedShows.length > 0 && (
-            <Section title="Top Rated TV Shows" items={topRatedShows} />
+            <MovieSection
+              title="Top Rated TV Shows"
+              movies={topRatedShows}
+              showActions={false}
+              onMovieAction={handleMovieAction}
+            />
           )}
         </div>
       </div>
