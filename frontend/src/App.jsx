@@ -14,7 +14,7 @@ import './App.css'
 
 function App() {
   return (
-    <BrowserRouter basename="/webflix-movie-webapp">
+    <BrowserRouter basename="/webflix-movie-app">
       <div className="flex flex-col min-h-screen">
         <APIHealthCheck />
         <Header />
