@@ -1,14 +1,12 @@
 {
-  "name": "webflix-movie-webapp-root",
+  "name": "webflix-movie-app",
   "version": "1.0.0",
-  "description": "Root package for Webflix Movie App with React frontend",
+  "description": "A Netflix-inspired movie browsing application built with React",
   "private": true,
   "scripts": {
-    "dev": "node start-dev.js",
-    "setup-frontend": "cd frontend && npm install",
-    "setup": "npm run setup-frontend",
-    "start-frontend": "cd frontend && npm run dev",
-    "build": "cd frontend && npm run build"
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "deploy": "cd frontend && npm run deploy"
   },
   "author": "",
   "license": "MIT"
