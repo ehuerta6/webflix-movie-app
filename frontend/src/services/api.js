@@ -1,23 +1,27 @@
-// API service for movie data through our Flask backend
+// API service for movie data using TMDB API directly
 import { getTMDBImageUrl, preloadImages } from '../utils/images'
 
-const BASE_URL = 'http://localhost:5000/api'
+const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY
+const TMDB_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 /**
- * Fetch data from the backend API
+ * Fetch data from the TMDB API
  * @param {string} endpoint - The API endpoint to fetch
  * @param {Object} params - Additional query parameters
  * @returns {Promise<Object>} The API response data
  */
 async function fetchFromAPI(endpoint, params = {}) {
   try {
-    // Build query string if params are provided
-    const queryString =
-      Object.keys(params).length > 0
-        ? `?${new URLSearchParams(params).toString()}`
-        : ''
+    // Add API key to params
+    const queryParams = {
+      api_key: TMDB_API_KEY,
+      ...params,
+    }
 
-    const response = await fetch(`${BASE_URL}${endpoint}${queryString}`)
+    // Build query string
+    const queryString = `?${new URLSearchParams(queryParams).toString()}`
+
+    const response = await fetch(`${TMDB_BASE_URL}${endpoint}${queryString}`)
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -169,12 +173,14 @@ export const fetchPersonDetails = async (id) => {
 export { getTMDBImageUrl, preloadImages }
 
 /**
- * Check if the API is accessible
+ * Check if the TMDB API is accessible
  * @returns {Promise<boolean>} True if the API is accessible
  */
 export const checkAPIHealth = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/health`)
+    const response = await fetch(
+      `${TMDB_BASE_URL}/configuration?api_key=${TMDB_API_KEY}`
+    )
     return response.ok
   } catch (error) {
     console.error('API health check failed:', error)

@@ -49,8 +49,8 @@ const APIHealthCheck = memo(() => {
     <div className="fixed top-0 left-0 right-0 bg-red-600 text-white p-2 text-center z-50">
       <p className="flex items-center justify-center">
         <span>
-          Unable to connect to the backend API. Please make sure the Flask
-          server is running.
+          Unable to connect to the TMDB API. Please check your internet
+          connection and try again.
         </span>
         <Button
           variant="secondary"

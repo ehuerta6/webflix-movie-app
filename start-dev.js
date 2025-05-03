@@ -4,11 +4,9 @@ const os = require('os');
 
 // Determine command prefix based on OS
 const isWindows = os.platform() === 'win32';
-const shellOption = isWindows ? true : '/bin/bash';
 
 // Define paths
 const frontendPath = path.join(__dirname, 'frontend');
-const backendPath = path.join(__dirname, 'backend');
 
 // Function to start a process
 function startProcess(command, args, cwd, name) {
@@ -16,7 +14,7 @@ function startProcess(command, args, cwd, name) {
 
   const childProcess = spawn(command, args, {
     cwd,
-    shell: shellOption,
+    shell: isWindows ? true : '/bin/bash',
     stdio: 'pipe',
   });
 
@@ -35,28 +33,9 @@ function startProcess(command, args, cwd, name) {
   return childProcess;
 }
 
-// Start backend server
-console.log('Starting development servers...\n');
-
-// Determine if we should activate venv first
-const activateVenv = isWindows
-  ? `${path.join(backendPath, 'venv', 'Scripts', 'activate')} &&`
-  : `source ${path.join(backendPath, 'venv', 'bin', 'activate')} &&`;
-
-// Start Flask backend
-const backendCommand = isWindows ? 'cmd' : 'bash';
-const backendArgs = isWindows
-  ? ['/c', `${activateVenv} flask run`]
-  : ['-c', `${activateVenv} flask run`];
-
-const backendProcess = startProcess(
-  backendCommand,
-  backendArgs,
-  backendPath,
-  'Backend'
-);
-
 // Start frontend
+console.log('Starting development server...\n');
+
 const frontendProcess = startProcess(
   isWindows ? 'npm.cmd' : 'npm',
   ['run', 'dev'],
@@ -66,13 +45,11 @@ const frontendProcess = startProcess(
 
 // Handle termination
 process.on('SIGINT', () => {
-  console.log('Shutting down development servers...');
-  backendProcess.kill();
+  console.log('Shutting down development server...');
   frontendProcess.kill();
   process.exit(0);
 });
 
-console.log('\nDevelopment servers started!');
-console.log('- Backend: http://localhost:5000');
+console.log('\nDevelopment server started!');
 console.log('- Frontend: http://localhost:5173');
-console.log('\nPress Ctrl+C to stop both servers.');
+console.log('\nPress Ctrl+C to stop the server.');
